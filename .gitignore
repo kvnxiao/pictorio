@@ -16,3 +16,8 @@
 
 .idea/
 *.syso
+
+# Root folder
+index.html
+pictorio.exe
+pictorio

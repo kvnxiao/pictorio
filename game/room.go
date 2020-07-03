@@ -27,6 +27,7 @@ type Room struct {
 
 	// cleanup is a channel that stops the globalWriter message queue goroutine from running
 	cleanup chan bool
+	closed  bool
 }
 
 func NewRoom(roomID string) *Room {
@@ -34,6 +35,7 @@ func NewRoom(roomID string) *Room {
 		roomID:  roomID,
 		players: make(map[*player]struct{}),
 		mq:      make(chan []byte),
+		cleanup: make(chan bool),
 	}
 	go ro.globalWriter()
 	return ro
@@ -52,14 +54,28 @@ func (r *Room) addPlayer(p *player) {
 
 // removePlayer removes a player from the room
 func (r *Room) removePlayer(p *player) {
+	log.Info().Msg("Removing player")
 	r.playerMu.Lock()
 	delete(r.players, p)
+	log.Info().Int("count", len(r.players)).Send()
 	r.playerMu.Unlock()
+}
+
+// count returns the number of players currently in the room
+func (r *Room) Count() int {
+	r.playerMu.Lock()
+	defer r.playerMu.Unlock()
+	return len(r.players)
 }
 
 // ConnectionHandler accepts a new WebSocket connection from the http request, and then subscribes it to all
 // future messages
 func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
+	if r.closed {
+		log.Error().Msg("Room is closed.")
+		return
+	}
+
 	conn, err := websocket.Accept(w, req, nil)
 	if err != nil {
 		log.Err(err).Send()
@@ -128,7 +144,6 @@ func (r *Room) writer(ctx context.Context, p *player, errChan chan error) {
 }
 
 func (r *Room) globalWriter() {
-	log.Info().Msg("Setting up global message queue forwarding")
 	for {
 		select {
 		case msg := <-r.mq:
@@ -138,8 +153,13 @@ func (r *Room) globalWriter() {
 				}
 			}
 		case <-r.cleanup:
-			log.Error().Msg("CLEANING UP ROOM!")
+			log.Info().Msg("CLEANING UP ROOM!")
 			return
 		}
 	}
+}
+
+func (r *Room) Cleanup() {
+	r.cleanup <- true
+	r.closed = true
 }

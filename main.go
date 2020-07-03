@@ -6,8 +6,8 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/kvnxiao/pictorio/ctxs"
-	"github.com/kvnxiao/pictorio/gameserver"
-	"github.com/kvnxiao/pictorio/room"
+	"github.com/kvnxiao/pictorio/game"
+	"github.com/kvnxiao/pictorio/hub"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,7 +24,7 @@ func main() {
 		middleware.RealIP,
 	)
 
-	gs := gameserver.New()
+	gs := hub.New()
 
 	r.HandleFunc("/", indexHandler)
 
@@ -36,7 +36,7 @@ func main() {
 
 	r.Route("/room", func(r chi.Router) {
 		r.Route("/{roomID}", func(r chi.Router) {
-			r.Use(room.Middleware)
+			r.Use(game.Middleware)
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 				_, ok := ctxs.RoomID(ctx)

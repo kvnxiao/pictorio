@@ -1,4 +1,4 @@
-package room
+package game
 
 import (
 	"context"
@@ -40,8 +40,8 @@ func validateID(roomID string) error {
 	return nil
 }
 
-// GenerateID wraps the uniuri package to return a string with a constant length of 9 characters, using alphanumeric
+// GenerateRoomID wraps the uniuri package to return a string with a constant length of 9 characters, using alphanumeric
 // characters including capitalization [a-zA-Z0-9], representing a room ID.
-func GenerateID() string {
+func GenerateRoomID() string {
 	return uniuri.NewLen(idLength)
 }

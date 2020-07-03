@@ -1,4 +1,4 @@
-package room
+package game
 
 import (
 	"context"
@@ -24,6 +24,9 @@ type Room struct {
 	// mq is the message queue of incoming messages from players
 	// TODO: change channel type from []byte to a struct that contains the player information as well
 	mq chan []byte
+
+	// cleanup is a channel that stops the globalWriter message queue goroutine from running
+	cleanup chan bool
 }
 
 func NewRoom(roomID string) *Room {
@@ -32,11 +35,8 @@ func NewRoom(roomID string) *Room {
 		players: make(map[*player]struct{}),
 		mq:      make(chan []byte),
 	}
+	go ro.globalWriter()
 	return ro
-}
-
-func (r *Room) Handle() {
-	go r.globalWriter(context.Background())
 }
 
 func (r *Room) ID() string {
@@ -103,6 +103,7 @@ func (r *Room) reader(ctx context.Context, p *player, errChan chan error) {
 		log.Info().Err(err).Bytes("msg", b).Msg("Read something new!")
 		if err != nil {
 			errChan <- err
+			log.Error().Msg("DONE reader!")
 			return
 		}
 		r.mq <- b
@@ -120,13 +121,13 @@ func (r *Room) writer(ctx context.Context, p *player, errChan chan error) {
 				return
 			}
 		case <-ctx.Done():
-			log.Error().Msg("DONE!")
+			log.Error().Msg("DONE writer!")
 			return
 		}
 	}
 }
 
-func (r *Room) globalWriter(ctx context.Context) {
+func (r *Room) globalWriter() {
 	log.Info().Msg("Setting up global message queue forwarding")
 	for {
 		select {
@@ -136,8 +137,8 @@ func (r *Room) globalWriter(ctx context.Context) {
 					p.outgoing <- msg
 				}
 			}
-		case <-ctx.Done():
-			log.Error().Msg("DONE!")
+		case <-r.cleanup:
+			log.Error().Msg("CLEANING UP ROOM!")
 			return
 		}
 	}

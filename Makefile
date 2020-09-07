@@ -6,3 +6,6 @@ endif
 
 build:
 	go build -o $(OUTPUT)
+
+lint:
+	golangci-lint run

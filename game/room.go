@@ -6,44 +6,41 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/kvnxiao/pictorio/game/player"
+	"github.com/kvnxiao/pictorio/random"
 	"github.com/rs/zerolog/log"
 	"nhooyr.io/websocket"
 )
 
-type player struct {
-	outgoing chan []byte
-	conn     *websocket.Conn
-	id       string
-}
-
 type Room struct {
-	// roomID represents the unique identifier associated with the room
-	roomID string
+	// mu is a mutex for checking the state of the room, i.e. whether it is closed or not when a person joins
+	mu sync.Mutex
 
-	// playerMu is a mutex for synchronizing on reads and modifications to the players map
-	playerMu sync.Mutex
-
-	// players represents a set of individual player pointers
-	players map[*player]struct{}
-
-	// messageQueue is the message queue of incoming messages from players
-	// TODO: change channel type from []byte to a struct that contains the player information as well
-	messageQueue chan []byte
+	// closed tells when to stop accepting new WebSocket connections, to prevent new people from joining the room
+	closed bool
 
 	// cleanup is a channel that stops the eventLoop's messageQueue goroutine from running
 	cleanup chan bool
 
-	// closed tells when to stop accepting new WebSocket connections, to prevent new people from joining the room
-	closed bool
+	// roomID represents the unique identifier associated with the room
+	roomID string
+
+	// players represents a set of individual player pointers
+	players *player.Players
+
+	// messageQueue is the message queue of incoming messages from players
+	// TODO: change channel type from []byte to a struct that contains the player information as well
+	messageQueue chan []byte
 }
 
 // NewRoom creates an empty room with the provided roomID string and sets up the global.
 func NewRoom(roomID string) *Room {
 	ro := &Room{
 		roomID:       roomID,
-		players:      make(map[*player]struct{}),
+		players:      player.NewContainer(),
 		messageQueue: make(chan []byte),
 		cleanup:      make(chan bool),
+		closed:       false,
 	}
 	go ro.eventLoop()
 	return ro
@@ -55,39 +52,43 @@ func (r *Room) ID() string {
 }
 
 // addPlayer registers a player who has joined the room.
-func (r *Room) addPlayer(p *player) {
-	r.playerMu.Lock()
-	r.players[p] = struct{}{}
-	r.playerMu.Unlock()
+func (r *Room) addPlayer(p *player.Player) {
+	log.Info().Msg("Adding player")
+	r.players.Add(p)
 }
 
 // removePlayer removes a player from the room.
-func (r *Room) removePlayer(p *player) {
-	log.Info().Msg("Removing player")
-	r.playerMu.Lock()
-	delete(r.players, p)
-	log.Info().Int("count", len(r.players)).Send()
-	r.playerMu.Unlock()
+func (r *Room) removePlayer(p *player.Player) {
+	log.Info().Str("id", p.ID).Msg("Removing player")
+	r.players.Remove(p)
 }
 
 // Count returns the number of players currently in the room.
 func (r *Room) Count() int {
-	r.playerMu.Lock()
-	defer r.playerMu.Unlock()
-	return len(r.players)
+	return r.players.Count()
 }
 
 // Cleanup sends a clean-up signal to the running eventLoop which stops handling new messages, and also sets the room's
 // closed state to true, so that the room will not accept new WebSocket connections.
 func (r *Room) Cleanup() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.cleanup <- true
 	r.closed = true
+}
+
+func (r *Room) isClosed() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.closed
 }
 
 // ConnectionHandler accepts a new WebSocket connection from the http request, and then subscribes it to all
 // future messages.
 func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
-	if r.closed {
+	if r.isClosed() {
 		log.Error().Msg("Room is closed.")
 		return
 	}
@@ -111,56 +112,26 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // newPlayer instantiates a new player struct from the incoming WebSocket connection.
+// This method blocks after a player is added to the room, and waits until an error is encountered from either reading
+// from the player's WebSocket connection, or when the server fails to write to the player's connection.
 func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
 	errChan := make(chan error)
 
-	p := &player{
-		outgoing: make(chan []byte),
-		conn:     conn,
-	}
+	// TODO: pass in real user id
+	p := player.New(conn, random.RandString(12))
 
 	r.addPlayer(p)
 	defer r.removePlayer(p)
 
-	log.Info().Msg("Added new player")
-	go r.reader(ctx, p, errChan)
-	go r.writer(ctx, p, errChan)
+	log.Info().Str("id", p.ID).Msg("Added new player")
+	go p.ReaderLoop(ctx, r.messageQueue, errChan)
+	go p.WriterLoop(ctx, errChan)
 
+	// blocks on waiting for an error to be sent to the errChan.
+	// an error will be sent through the errChan if a player's connection fails to be read from,
+	// or fails to be written to
 	err := <-errChan
 	return err
-}
-
-// reader represents the read-loop that continuously ingests new messages from a player's WebSocket connection.
-func (r *Room) reader(ctx context.Context, p *player, errChan chan error) {
-	for {
-		_, b, err := p.conn.Read(ctx)
-		log.Info().Err(err).Bytes("msg", b).Msg("Read something new!")
-		if err != nil {
-			errChan <- err
-			log.Error().Msg("DONE reader!")
-			return
-		}
-		r.messageQueue <- b
-		log.Info().Bytes("msg", b)
-	}
-}
-
-// writer represents the write-loop that continuously ingests messages queued into the player's outgoing message channel
-// and writes to the player's WebSocket connection.
-func (r *Room) writer(ctx context.Context, p *player, errChan chan error) {
-	for {
-		select {
-		case msg := <-p.outgoing:
-			err := p.conn.Write(ctx, websocket.MessageText, msg)
-			if err != nil {
-				errChan <- err
-				return
-			}
-		case <-ctx.Done():
-			log.Error().Msg("DONE writer!")
-			return
-		}
-	}
 }
 
 // eventLoop represents a single instance of (i.e. the current room's) game logic, which handles and
@@ -170,11 +141,7 @@ func (r *Room) eventLoop() {
 	for {
 		select {
 		case msg := <-r.messageQueue:
-			for p := range r.players {
-				if p != nil {
-					p.outgoing <- msg
-				}
-			}
+			r.players.Broadcast(msg)
 		case <-r.cleanup:
 			log.Info().Msg("CLEANING UP ROOM!")
 			return

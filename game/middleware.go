@@ -8,6 +8,7 @@ import (
 
 	"github.com/dchest/uniuri"
 	"github.com/go-chi/chi"
+	"github.com/kvnxiao/pictorio/ctxs"
 )
 
 const (
@@ -27,7 +28,7 @@ func Middleware(next http.Handler) http.Handler {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		ctx := context.WithValue(r.Context(), "roomID", roomID)
+		ctx := context.WithValue(r.Context(), ctxs.KeyRoomID, roomID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

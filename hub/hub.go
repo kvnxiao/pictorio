@@ -40,13 +40,14 @@ func (h *Hub) NewRoom() *game.Room {
 
 	go h.roomCleanupListener(r)
 
+	log.Info().Str("roomID", roomID).Msg("Creating new room")
+
 	return r
 }
 
 func (h *Hub) roomCleanupListener(r *game.Room) {
 	everyMinute := time.NewTicker(1 * time.Minute)
 	for range everyMinute.C {
-		log.Info().Msg("test")
 		if r.Count() == 0 {
 			r.Cleanup()
 			break

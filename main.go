@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/game"
 	"github.com/kvnxiao/pictorio/hub"
@@ -12,6 +13,7 @@ import (
 )
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: serve built frontend dist folder
 	http.ServeFile(w, r, "index.html")
 }
 
@@ -21,13 +23,16 @@ func main() {
 		middleware.Recoverer,
 		middleware.RequestID,
 		middleware.RealIP,
+		cors.Handler(cors.Options{
+			AllowedOrigins: []string{"http://localhost:8080"},
+		}),
 	)
 
 	gs := hub.New()
 
 	r.HandleFunc("/", indexHandler)
 
-	r.Get("/create", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/create", func(w http.ResponseWriter, r *http.Request) {
 		ro := gs.NewRoom()
 		http.Redirect(w, r, "/room/"+ro.ID(), http.StatusSeeOther)
 		log.Info().Str("roomID", ro.ID()).Send()

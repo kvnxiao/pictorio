@@ -8,10 +8,8 @@ import (
 
 	"github.com/dchest/uniuri"
 	"github.com/go-chi/chi"
+	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
-	"github.com/kvnxiao/pictorio/response"
-	"github.com/kvnxiao/pictorio/model"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -28,10 +26,8 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roomID := chi.URLParam(r, "roomID")
 		if err := validateID(roomID); err != nil {
-			if err := response.Json(w, model.RoomResponse{Exists: false}); err != nil {
-				log.Err(err).Str("roomID", roomID).Msg("Invalid room ID")
-			}
-			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			cookies.FlashError(w, "Invalid room ID")
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxs.KeyRoomID, roomID)

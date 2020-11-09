@@ -1,4 +1,4 @@
-package service
+package fileserver
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ var (
 	root http.Dir
 	fs   http.Handler
 
-	files = []string{
+	Files = []string{
 		"/css/*",
 		"/js/*",
 		"/img/*",
@@ -28,11 +28,11 @@ func init() {
 	fs = http.FileServer(root)
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, string(root))
 }
 
-func handleFolder(r chi.Router, path string) {
+func HandleFolder(r chi.Router, path string) {
 	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	})

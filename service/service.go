@@ -5,7 +5,10 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/kvnxiao/pictorio/api"
+	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
+	"github.com/kvnxiao/pictorio/fileserver"
 	"github.com/kvnxiao/pictorio/game"
 	"github.com/kvnxiao/pictorio/hub"
 	"github.com/kvnxiao/pictorio/model"
@@ -35,18 +38,28 @@ func (s *Service) SetupMiddleware() *Service {
 }
 
 func (s *Service) FileServer() *Service {
-	for _, file := range files {
-		handleFolder(s.router, file)
+	for _, file := range fileserver.Files {
+		fileserver.HandleFolder(s.router, file)
 	}
 	return s
 }
 
 func (s *Service) RegisterRoutes() *Service {
-	s.router.NotFound(indexHandler)
+	s.router.NotFound(fileserver.IndexHandler)
 
-	s.router.Post("/create", func(w http.ResponseWriter, r *http.Request) {
+	s.router.Post(api.CreateRoom, func(w http.ResponseWriter, r *http.Request) {
 		ro := s.hub.NewRoom()
-		if err := response.Json(w, model.RoomResponse{RoomID: ro.ID(), Exists: true}); err != nil {
+		if err := response.Json(w, model.RoomResponse{RoomID: ro.ID(), Exists: true}, http.StatusOK); err != nil {
+			log.Err(err).Msg("Unable to encode JSON response")
+		}
+	})
+
+	s.router.Get(api.FlashMessage, func(w http.ResponseWriter, r *http.Request) {
+		msg, err := cookies.ReadError(w, r)
+		if err != nil {
+			log.Err(err).Msg("Failed to read flash error message")
+		}
+		if err := response.Json(w, msg, http.StatusOK); err != nil {
 			log.Err(err).Msg("Unable to encode JSON response")
 		}
 	})
@@ -58,13 +71,12 @@ func (s *Service) RegisterRoutes() *Service {
 				ctx := r.Context()
 				roomID, ok := ctxs.RoomID(ctx)
 				if !ok {
-					if err := response.Json(w, model.RoomResponse{Exists: false}); err != nil {
+					if err := response.Json(w, model.RoomResponse{Exists: false}, http.StatusBadRequest); err != nil {
 						log.Err(err).Str("route", "/room/"+roomID).Msg("Unable to encode JSON response")
 					}
-					http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 					return
 				}
-				indexHandler(w, r)
+				fileserver.IndexHandler(w, r)
 			})
 			r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()

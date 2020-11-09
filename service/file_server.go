@@ -1,4 +1,4 @@
-package fs
+package service
 
 import (
 	"net/http"
@@ -28,7 +28,7 @@ func init() {
 	fs = http.FileServer(root)
 }
 
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
+func indexHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, string(root))
 }
 
@@ -36,10 +36,4 @@ func handleFolder(r chi.Router, path string) {
 	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	})
-}
-
-func FileServer(r chi.Router) {
-	for _, file := range files {
-		handleFolder(r, file)
-	}
 }

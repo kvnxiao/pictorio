@@ -1,4 +1,4 @@
-package httpw
+package response
 
 import (
 	"encoding/json"

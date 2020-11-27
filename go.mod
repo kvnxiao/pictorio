@@ -8,5 +8,6 @@ require (
 	github.com/go-chi/cors v1.1.1
 	github.com/klauspost/compress v1.10.3 // indirect
 	github.com/rs/zerolog v1.19.0
+	github.com/segmentio/ksuid v1.0.3
 	nhooyr.io/websocket v1.8.7-0.20200705210220-897a573291be
 )

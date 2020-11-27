@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/kvnxiao/pictorio/cookies"
+	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/game/player"
 	"github.com/kvnxiao/pictorio/random"
 	"github.com/rs/zerolog/log"
+	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
 )
 
@@ -59,7 +62,7 @@ func (r *Room) addPlayer(p *player.Player) {
 
 // removePlayer removes a player from the room.
 func (r *Room) removePlayer(p *player.Player) {
-	log.Info().Str("id", p.ID).Msg("Removing player")
+	log.Info().Str("id", p.ID.String()).Msg("Removing player")
 	r.players.Remove(p)
 }
 
@@ -93,13 +96,44 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Read player unique ID or generate one if not exist
+	playerID, err := cookies.GetPlayerID(w, req)
+	if err != nil || playerID == "" {
+		log.Info().Msg("Generating unique ID for new player")
+		randomID, err := ksuid.NewRandom()
+		if err != nil {
+			log.Err(err).Msg("Could not generate a unique ID for new player")
+			return
+		}
+		playerID = randomID.String()
+		cookies.SetPlayerID(w, playerID)
+	}
+
+	// Ensure player ID is of valid type
+	playerKSUID, err := ksuid.Parse(playerID)
+	if err != nil {
+		log.Err(err).Msg("Could not parse player ID")
+	}
+
+	// Read player name
+	name, err := cookies.GetPlayerName(w, req)
+	if err != nil || name == "" {
+		log.Info().Msg("Generating random name for new player")
+		name = random.GenerateName()
+		cookies.SetPlayerName(w, name)
+	}
+
+	// Save player ID and name to connection context
+	ctx := context.WithValue(req.Context(), ctxs.KeyPlayerID, playerKSUID)
+	ctx = context.WithValue(ctx, ctxs.KeyPlayerName, name)
+
 	conn, err := websocket.Accept(w, req, nil)
 	if err != nil {
 		log.Err(err).Send()
 		return
 	}
 
-	err = r.newPlayer(req.Context(), conn)
+	err = r.newPlayer(ctx, conn)
 	if errors.Is(err, context.Canceled) {
 		log.Err(err).Str("type", "cancelled").Send()
 		return
@@ -117,13 +151,25 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
 	errChan := make(chan error)
 
-	// TODO: pass in real user id
-	p := player.New(conn, random.RandString(12))
+	playerKSUID, ok := ctxs.PlayerID(ctx)
+	if !ok {
+		return errors.New("could not get player ID from connection context")
+	}
+	playerName, ok := ctxs.PlayerName(ctx)
+	if !ok {
+		return errors.New("could not get player name from connection context")
+	}
+
+	p := player.New(conn, playerKSUID, playerName)
 
 	r.addPlayer(p)
 	defer r.removePlayer(p)
 
-	log.Info().Str("id", p.ID).Msg("Added new player")
+	log.Info().
+		Str("roomID", r.roomID).
+		Str("pid", p.ID.String()).
+		Str("pname", p.Name).
+		Msg("Added new player to room")
 	go p.ReaderLoop(ctx, r.messageQueue, errChan)
 	go p.WriterLoop(ctx, errChan)
 

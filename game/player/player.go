@@ -4,20 +4,23 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
+	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
 )
 
 type Player struct {
 	outgoing chan []byte
 	conn     *websocket.Conn
-	ID       string
+	ID       ksuid.KSUID
+	Name     string
 }
 
-func New(conn *websocket.Conn, id string) *Player {
+func New(conn *websocket.Conn, id ksuid.KSUID, name string) *Player {
 	return &Player{
 		outgoing: make(chan []byte),
 		conn:     conn,
 		ID:       id,
+		Name:     name,
 	}
 }
 
@@ -30,7 +33,10 @@ func (p *Player) ReaderLoop(ctx context.Context, messageQueue chan<- []byte, err
 			log.Info().Msg("DONE reader!")
 			return
 		} else {
-			log.Info().Bytes("msg", readBytes).Str("id", p.ID).Msg("Read something from player")
+			log.Info().
+				Bytes("msg", readBytes).
+				Str("id", p.ID.String()).
+				Msg("Received message from player")
 		}
 		messageQueue <- readBytes
 	}

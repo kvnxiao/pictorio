@@ -22,14 +22,14 @@ func (l *Players) Add(p *Player) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.players[p.ID] = p
+	l.players[p.ID.String()] = p
 }
 
 func (l *Players) Remove(p *Player) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	delete(l.players, p.ID)
+	delete(l.players, p.ID.String())
 }
 
 func (l *Players) Count() int {

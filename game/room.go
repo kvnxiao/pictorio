@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/dchest/uniuri"
 	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/game/player"
@@ -13,6 +14,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
+)
+
+const (
+	idLength = 9
 )
 
 type Room struct {
@@ -193,4 +198,10 @@ func (r *Room) eventLoop() {
 			return
 		}
 	}
+}
+
+// GenerateRoomID wraps the uniuri package to return a string with a constant length of 9 characters, using alphanumeric
+// characters including capitalization [a-zA-Z0-9], representing a room ID.
+func GenerateRoomID() string {
+	return uniuri.NewLen(idLength)
 }

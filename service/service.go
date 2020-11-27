@@ -9,7 +9,6 @@ import (
 	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/fileserver"
-	"github.com/kvnxiao/pictorio/game"
 	"github.com/kvnxiao/pictorio/hub"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/response"
@@ -66,7 +65,7 @@ func (s *Service) RegisterRoutes() *Service {
 
 	s.router.Route("/room", func(r chi.Router) {
 		r.Route("/{roomID}", func(r chi.Router) {
-			r.Use(game.Middleware)
+			r.Use(s.roomIDMiddleware)
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
 				roomID, ok := ctxs.RoomID(ctx)

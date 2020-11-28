@@ -2,6 +2,8 @@ package player
 
 import (
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Players struct {
@@ -41,6 +43,14 @@ func (l *Players) Count() int {
 
 func (l *Players) Broadcast(msg []byte) {
 	for _, p := range l.players {
+		p.outgoing <- msg
+	}
+}
+
+func (l *Players) Send(playerID string, msg []byte) {
+	p, ok := l.players[playerID]
+	if ok {
+		log.Info().Msg(string(msg))
 		p.outgoing <- msg
 	}
 }

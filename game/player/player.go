@@ -3,6 +3,7 @@ package player
 import (
 	"context"
 
+	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
@@ -15,12 +16,13 @@ type Player struct {
 	Name     string
 }
 
-func New(conn *websocket.Conn, id ksuid.KSUID, name string) *Player {
+func New(conn *websocket.Conn, player model.Player) *Player {
+	playerKSUID, _ := ksuid.Parse(player.ID)
 	return &Player{
 		outgoing: make(chan []byte),
 		conn:     conn,
-		ID:       id,
-		Name:     name,
+		ID:       playerKSUID,
+		Name:     player.Name,
 	}
 }
 
@@ -53,6 +55,7 @@ func (p *Player) WriterLoop(ctx context.Context, errChan chan error) {
 				errChan <- err
 				return
 			}
+			log.Info().Str("pid", p.ID.String()).Msg("Wrote message to player")
 		case <-ctx.Done():
 			log.Info().Msg("DONE writer!")
 			return

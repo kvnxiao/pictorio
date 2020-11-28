@@ -9,7 +9,9 @@ import (
 	"github.com/dchest/uniuri"
 	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
+	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/player"
+	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/random"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
@@ -165,7 +167,12 @@ func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
 		return errors.New("could not get player name from connection context")
 	}
 
-	p := player.New(conn, playerKSUID, playerName)
+	playerModel := model.Player{
+		ID:   playerKSUID.String(),
+		Name: playerName,
+	}
+
+	p := player.New(conn, playerModel)
 
 	r.addPlayer(p)
 	defer r.removePlayer(p)
@@ -177,6 +184,9 @@ func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
 		Msg("Added new player to room")
 	go p.ReaderLoop(ctx, r.messageQueue, errChan)
 	go p.WriterLoop(ctx, errChan)
+
+	// send SelfJoinEvent to user who just joined the room
+	r.players.Send(playerKSUID.String(), events.SelfJoinEventMessage(playerModel))
 
 	// blocks on waiting for an error to be sent to the errChan.
 	// an error will be sent through the errChan if a player's connection fails to be read from,

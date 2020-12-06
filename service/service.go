@@ -97,10 +97,9 @@ func (s *Service) RegisterRoutes() *Service {
 	return s
 }
 
-func (s *Service) Serve() {
-	port := ":3000"
-	log.Info().Msg("Starting server on port " + port)
-	err := http.ListenAndServe(port, s.router)
+func (s *Service) Serve(addr string) {
+	log.Info().Msg("Starting server on " + addr)
+	err := http.ListenAndServe(addr, s.router)
 	if err != nil {
 		log.Fatal().Err(err)
 	}

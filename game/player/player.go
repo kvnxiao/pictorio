@@ -34,12 +34,11 @@ func (p *Player) ReaderLoop(ctx context.Context, messageQueue chan<- []byte, err
 			errChan <- err
 			log.Info().Msg("DONE reader!")
 			return
-		} else {
-			log.Info().
-				Bytes("msg", readBytes).
-				Str("id", p.ID.String()).
-				Msg("Received message from player")
 		}
+		log.Info().
+			Bytes("msg", readBytes).
+			Str("id", p.ID.String()).
+			Msg("Received message from player")
 		messageQueue <- readBytes
 	}
 }
@@ -55,7 +54,7 @@ func (p *Player) WriterLoop(ctx context.Context, errChan chan error) {
 				errChan <- err
 				return
 			}
-			log.Info().Str("pid", p.ID.String()).Msg("Wrote message to player")
+			log.Info().Bytes("msg", msg).Str("pid", p.ID.String()).Msg("Wrote message to player")
 		case <-ctx.Done():
 			log.Info().Msg("DONE writer!")
 			return

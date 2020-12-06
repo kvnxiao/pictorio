@@ -41,12 +41,23 @@ func (l *Players) Count() int {
 	return len(l.players)
 }
 
+// Broadcast sends a WebSocket message to every player in the room
 func (l *Players) Broadcast(msg []byte) {
 	for _, p := range l.players {
 		p.outgoing <- msg
 	}
 }
 
+// BroadcastExclude sends a WebSocket message to every player, excluding the player specified by the player ID
+func (l *Players) BroadcastExclude(msg []byte, playerID string) {
+	for id, p := range l.players {
+		if id != playerID {
+			p.outgoing <- msg
+		}
+	}
+}
+
+// Send sends a WebSocket message to a player specified by the player ID
 func (l *Players) Send(playerID string, msg []byte) {
 	p, ok := l.players[playerID]
 	if ok {

@@ -185,13 +185,19 @@ func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
 	go p.ReaderLoop(ctx, r.messageQueue, errChan)
 	go p.WriterLoop(ctx, errChan)
 
-	// send SelfJoinEvent to user who just joined the room
-	r.players.Send(playerKSUID.String(), events.SelfJoinEventMessage(playerModel))
+	r.players.Send(p.ID.String(), events.SelfJoinEventMessage(playerModel))
+	r.players.Broadcast(events.PlayerJoin(playerModel))
 
 	// blocks on waiting for an error to be sent to the errChan.
 	// an error will be sent through the errChan if a player's connection fails to be read from,
 	// or fails to be written to
 	err := <-errChan
+
+	r.players.BroadcastExclude(events.PlayerLeave(model.Player{
+		ID:   p.ID.String(),
+		Name: p.Name,
+	}), p.ID.String())
+
 	return err
 }
 

@@ -5,21 +5,21 @@ import (
 )
 
 const (
-	cookiePlayerID   = "pid"
-	cookiePlayerName = "pname"
+	cookieUserID   = "uid"
+	cookieUserName = "uname"
 )
 
-func SetPlayerID(w http.ResponseWriter, id string) {
+func SetUserID(w http.ResponseWriter, id string) {
 	cookie := &http.Cookie{
-		Name:  cookiePlayerID,
+		Name:  cookieUserID,
 		Path:  "/",
 		Value: encode(id),
 	}
 	http.SetCookie(w, cookie)
 }
 
-func GetPlayerID(w http.ResponseWriter, r *http.Request) (string, error) {
-	c, err := r.Cookie(cookiePlayerID)
+func GetUserID(w http.ResponseWriter, r *http.Request) (string, error) {
+	c, err := r.Cookie(cookieUserID)
 	if err != nil {
 		switch err {
 		case http.ErrNoCookie:
@@ -35,17 +35,17 @@ func GetPlayerID(w http.ResponseWriter, r *http.Request) (string, error) {
 	return string(value), nil
 }
 
-func SetPlayerName(w http.ResponseWriter, name string) {
+func SetUserName(w http.ResponseWriter, name string) {
 	cookie := &http.Cookie{
-		Name:  cookiePlayerName,
+		Name:  cookieUserName,
 		Path:  "/",
 		Value: encode(name),
 	}
 	http.SetCookie(w, cookie)
 }
 
-func GetPlayerName(w http.ResponseWriter, r *http.Request) (string, error) {
-	c, err := r.Cookie(cookiePlayerName)
+func GetUserName(w http.ResponseWriter, r *http.Request) (string, error) {
+	c, err := r.Cookie(cookieUserName)
 	if err != nil {
 		switch err {
 		case http.ErrNoCookie:

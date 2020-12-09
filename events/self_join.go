@@ -8,10 +8,10 @@ import (
 )
 
 type SelfJoinEvent struct {
-	Player model.Player `json:"player"`
+	Player model.User `json:"player"`
 }
 
-func SelfJoinEventMessage(player model.Player) []byte {
+func SelfJoinEventMessage(player model.User) []byte {
 	event := SelfJoinEvent{
 		Player: player,
 	}

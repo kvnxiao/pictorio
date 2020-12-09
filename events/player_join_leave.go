@@ -15,11 +15,11 @@ const (
 )
 
 type PlayerJoinLeaveEvent struct {
-	Player model.Player          `json:"player"`
+	Player model.User            `json:"player"`
 	Action PlayerJoinLeaveAction `json:"action"`
 }
 
-func joinLeaveEvent(player model.Player, action PlayerJoinLeaveAction) []byte {
+func joinLeaveEvent(player model.User, action PlayerJoinLeaveAction) []byte {
 	event := PlayerJoinLeaveEvent{
 		Player: player,
 		Action: action,
@@ -36,10 +36,10 @@ func joinLeaveEvent(player model.Player, action PlayerJoinLeaveAction) []byte {
 	return bytes
 }
 
-func PlayerJoin(player model.Player) []byte {
+func PlayerJoin(player model.User) []byte {
 	return joinLeaveEvent(player, PlayerActionJoin)
 }
 
-func PlayerLeave(player model.Player) []byte {
+func PlayerLeave(player model.User) []byte {
 	return joinLeaveEvent(player, PlayerActionLeave)
 }

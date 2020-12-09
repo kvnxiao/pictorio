@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/dchest/uniuri"
 	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
-	"github.com/kvnxiao/pictorio/events"
-	"github.com/kvnxiao/pictorio/game/player"
+	"github.com/kvnxiao/pictorio/game/state"
+	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/random"
 	"github.com/rs/zerolog/log"
@@ -19,41 +18,43 @@ import (
 )
 
 const (
-	idLength = 9
+	roomIDLength = 9
+
+	maxPlayerNum = 8
 )
 
 type Room struct {
+	// roomID represents the unique identifier associated with the room
+	roomID string
+
 	// mu is a mutex for checking the state of the room, i.e. whether it is closed or not when a person joins
 	mu sync.Mutex
+	// userMu is a mutex for handling websocket connections between
+	userMu sync.Mutex
 
 	// closed tells when to stop accepting new WebSocket connections, to prevent new people from joining the room
 	closed bool
 
-	// cleanup is a channel that stops the eventLoop's messageQueue goroutine from running
-	cleanup chan bool
+	// usersMap represents a set of individual users mapped by their user-ID
+	usersMap map[string]*user.User
 
-	// roomID represents the unique identifier associated with the room
-	roomID string
+	gameProcessor state.GameState
 
-	// players represents a set of individual player pointers
-	players *player.Players
-
-	// messageQueue is the message queue of incoming messages from players
-	// TODO: change channel type from []byte to a struct that contains the player information as well
-	messageQueue chan []byte
+	// startCleanupChan is a channel that signals the gameProcessor's event loop to stop running
+	startCleanupChan chan bool
 }
 
 // NewRoom creates an empty room with the provided roomID string and sets up the global.
 func NewRoom(roomID string) *Room {
-	ro := &Room{
-		roomID:       roomID,
-		players:      player.NewContainer(),
-		messageQueue: make(chan []byte),
-		cleanup:      make(chan bool),
-		closed:       false,
+	room := &Room{
+		roomID:           roomID,
+		closed:           false,
+		usersMap:         make(map[string]*user.User),
+		gameProcessor:    state.NewGameStateProcessor(maxPlayerNum),
+		startCleanupChan: make(chan bool),
 	}
-	go ro.eventLoop()
-	return ro
+	go room.gameProcessor.EventProcessor(room.startCleanupChan)
+	return room
 }
 
 // ID returns the unique room ID representing this room.
@@ -61,21 +62,28 @@ func (r *Room) ID() string {
 	return r.roomID
 }
 
-// addPlayer registers a player who has joined the room.
-func (r *Room) addPlayer(p *player.Player) {
-	log.Info().Msg("Adding player")
-	r.players.Add(p)
+// addUser registers a user who has joined the room.
+func (r *Room) addUser(user *user.User) {
+	r.userMu.Lock()
+	defer r.userMu.Unlock()
+
+	r.usersMap[user.ID] = user
 }
 
-// removePlayer removes a player from the room.
-func (r *Room) removePlayer(p *player.Player) {
-	log.Info().Str("id", p.ID.String()).Msg("Removing player")
-	r.players.Remove(p)
+// removeUser removes a user from the room.
+func (r *Room) removeUser(user *user.User) {
+	r.userMu.Lock()
+	defer r.userMu.Unlock()
+
+	delete(r.usersMap, user.ID)
 }
 
-// Count returns the number of players currently in the room.
+// Count returns the number of users currently in the room.
 func (r *Room) Count() int {
-	return r.players.Count()
+	r.userMu.Lock()
+	defer r.userMu.Unlock()
+
+	return len(r.usersMap)
 }
 
 // Cleanup sends a clean-up signal to the running eventLoop which stops handling new messages, and also sets the room's
@@ -84,7 +92,16 @@ func (r *Room) Cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.cleanup <- true
+	// get cleanup channel from game processor
+	gameProcessorCleanup := r.gameProcessor.Cleanup()
+
+	// signal to game processor that room is ready to be cleaned up
+	r.startCleanupChan <- true
+
+	// wait for game processor to be done cleaning up
+	<-gameProcessorCleanup
+
+	// set status of room to closed
 	r.closed = true
 }
 
@@ -103,121 +120,93 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Read player unique ID or generate one if not exist
-	playerID, err := cookies.GetPlayerID(w, req)
-	if err != nil || playerID == "" {
-		log.Info().Msg("Generating unique ID for new player")
+	// Read user's unique ID or generate one if not exist
+	userID, err := cookies.GetUserID(w, req)
+	if err != nil || userID == "" {
 		randomID, err := ksuid.NewRandom()
 		if err != nil {
-			log.Err(err).Msg("Could not generate a unique ID for new player")
+			log.Err(err).Msg("Could not generate a unique ID for new user")
 			return
 		}
-		playerID = randomID.String()
-		cookies.SetPlayerID(w, playerID)
+		userID = randomID.String()
+		cookies.SetUserID(w, userID)
 	}
 
-	// Ensure player ID is of valid type
-	playerKSUID, err := ksuid.Parse(playerID)
+	// Ensure user ID parsed from cookies is of expected type
+	userKSUID, err := ksuid.Parse(userID)
 	if err != nil {
-		log.Err(err).Msg("Could not parse player ID")
+		log.Err(err).Msg("Could not parse user ID")
 	}
 
-	// Read player name
-	name, err := cookies.GetPlayerName(w, req)
-	if err != nil || name == "" {
-		log.Info().Msg("Generating random name for new player")
-		name = random.GenerateName()
-		cookies.SetPlayerName(w, name)
+	// Read user name
+	userName, err := cookies.GetUserName(w, req)
+	if err != nil || userName == "" {
+		log.Info().Msg("Generating random name for new user")
+		userName = random.GenerateName()
+		cookies.SetUserName(w, userName)
 	}
 
-	// Save player ID and name to connection context
-	ctx := context.WithValue(req.Context(), ctxs.KeyPlayerID, playerKSUID)
-	ctx = context.WithValue(ctx, ctxs.KeyPlayerName, name)
+	// Save user ID and name to connection context
+	ctx := context.WithValue(req.Context(), ctxs.KeyUserID, userKSUID)
+	ctx = context.WithValue(ctx, ctxs.KeyUserName, userName)
 
 	conn, err := websocket.Accept(w, req, nil)
 	if err != nil {
-		log.Err(err).Send()
+		log.Err(err).Msg("Could not upgrade connection from user to a WebSocket connection.")
 		return
 	}
 
-	err = r.newPlayer(ctx, conn)
+	err = r.newUserConnection(ctx, conn)
 	if errors.Is(err, context.Canceled) {
-		log.Err(err).Str("type", "cancelled").Send()
+		log.Err(err).Str("type", "cancelled").Msg("User connection closed.")
 		return
 	}
 	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
 		websocket.CloseStatus(err) == websocket.StatusGoingAway {
-		log.Info().Err(err).Str("type", "closed").Send()
+		log.Info().Err(err).Str("type", "closed").Msg("User connection closed.")
 		return
 	}
 }
 
-// newPlayer instantiates a new player struct from the incoming WebSocket connection.
-// This method blocks after a player is added to the room, and waits until an error is encountered from either reading
-// from the player's WebSocket connection, or when the server fails to write to the player's connection.
-func (r *Room) newPlayer(ctx context.Context, conn *websocket.Conn) error {
-	errChan := make(chan error)
+// newUserConnection instantiates a new user struct from the incoming WebSocket connection.
+// This method blocks after a user is added to the room, and waits until an error is encountered from either reading
+// from the user's WebSocket connection, or when the server fails to write to the user's connection.
+func (r *Room) newUserConnection(ctx context.Context, conn *websocket.Conn) error {
+	connErrChan := make(chan error)
 
-	playerKSUID, ok := ctxs.PlayerID(ctx)
+	userKSUID, ok := ctxs.UserID(ctx)
 	if !ok {
-		return errors.New("could not get player ID from connection context")
+		return errors.New("could not get user ID from connection context")
 	}
-	playerName, ok := ctxs.PlayerName(ctx)
+	userName, ok := ctxs.UserName(ctx)
 	if !ok {
-		return errors.New("could not get player name from connection context")
+		return errors.New("could not get user name from connection context")
 	}
 
-	playerModel := model.Player{
-		ID:   playerKSUID.String(),
-		Name: playerName,
+	userModel := model.User{
+		ID:   userKSUID.String(),
+		Name: userName,
 	}
 
-	p := player.New(conn, playerModel)
+	u := user.NewUser(conn, userModel)
 
-	r.addPlayer(p)
-	defer r.removePlayer(p)
+	r.addUser(u)
+	defer r.removeUser(u)
 
 	log.Info().
 		Str("roomID", r.roomID).
-		Str("pid", p.ID.String()).
-		Str("pname", p.Name).
-		Msg("Added new player to room")
-	go p.ReaderLoop(ctx, r.messageQueue, errChan)
-	go p.WriterLoop(ctx, errChan)
+		Str("uid", u.ID).
+		Str("uname", u.Name).
+		Msg("Added new user to room")
 
-	r.players.Send(p.ID.String(), events.SelfJoinEventMessage(playerModel))
-	r.players.Broadcast(events.PlayerJoin(playerModel))
+	r.gameProcessor.UserJoined(ctx, u, connErrChan)
 
-	// blocks on waiting for an error to be sent to the errChan.
-	// an error will be sent through the errChan if a player's connection fails to be read from,
-	// or fails to be written to
-	err := <-errChan
+	// blocks on waiting for an error to be sent to the connErrChan.
+	// an error is sent through the channel if a user's connection either fails to be read from or written to
+	err := <-connErrChan
 
-	r.players.BroadcastExclude(events.PlayerLeave(model.Player{
-		ID:   p.ID.String(),
-		Name: p.Name,
-	}), p.ID.String())
+	r.gameProcessor.UserLeft(userModel.ID)
+	// user is removed after this function exits due to the defer statement
 
 	return err
-}
-
-// eventLoop represents a single instance of (i.e. the current room's) game logic, which handles and
-// processes incoming WebSocket messages from the player, as well as handles cleaning up the room when all players
-// have left the room.
-func (r *Room) eventLoop() {
-	for {
-		select {
-		case msg := <-r.messageQueue:
-			r.players.Broadcast(msg)
-		case <-r.cleanup:
-			log.Info().Msg("CLEANING UP ROOM!")
-			return
-		}
-	}
-}
-
-// GenerateRoomID wraps the uniuri package to return a string with a constant length of 9 characters, using alphanumeric
-// characters including capitalization [a-zA-Z0-9], representing a room ID.
-func GenerateRoomID() string {
-	return uniuri.NewLen(idLength)
 }

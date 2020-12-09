@@ -7,21 +7,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type SelfJoinEvent struct {
-	Player model.User `json:"player"`
+type RehydrateEvent struct {
+	User model.User `json:"user"`
 }
 
-func SelfJoinEventMessage(player model.User) []byte {
-	event := SelfJoinEvent{
-		Player: player,
+func RehydrateUser(user model.User) []byte {
+	event := RehydrateEvent{
+		User: user,
 	}
 	gameEvent := GameEvent{
-		Type: EventTypeSelfJoin,
+		Type: EventTypeRehydrate,
 		Data: event,
 	}
 	bytes, err := json.Marshal(&gameEvent)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal SelfJoinEvent into JSON.")
+		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
 		return nil
 	}
 	return bytes

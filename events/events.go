@@ -3,8 +3,7 @@ package events
 type GameEventType int
 
 const (
-	EventTypePlayerJoinLeaveEvent GameEventType = iota
-	EventTypeSelfJoin
+	EventTypeUserJoinLeaveEvent GameEventType = iota
 	EventTypeRehydrate
 	EventTypeChat
 	EventTypeDraw

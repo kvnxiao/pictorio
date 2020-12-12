@@ -2,6 +2,7 @@ package state
 
 import (
 	"github.com/kvnxiao/pictorio/game/user"
+	"github.com/kvnxiao/pictorio/model"
 )
 
 type PlayerState interface {
@@ -10,10 +11,13 @@ type PlayerState interface {
 	IsSpectator() bool
 	IsConnected() bool
 	IsReady() bool
+	UserModel() model.User
 
 	SetNewConnection(user *user.User)
 	SetConnected(connected bool)
 	SetReady(ready bool)
+
+	SendMessage(bytes []byte)
 }
 
 type Player struct {
@@ -56,6 +60,13 @@ func (p *Player) IsReady() bool {
 	return p.isReady
 }
 
+func (p *Player) UserModel() model.User {
+	return model.User{
+		ID:   p.user.ID,
+		Name: p.user.Name,
+	}
+}
+
 func (p *Player) SetNewConnection(user *user.User) {
 	p.user = user
 }
@@ -66,4 +77,8 @@ func (p *Player) SetConnected(connected bool) {
 
 func (p *Player) SetReady(ready bool) {
 	p.isReady = ready
+}
+
+func (p *Player) SendMessage(bytes []byte) {
+	p.user.Outgoing() <- bytes
 }

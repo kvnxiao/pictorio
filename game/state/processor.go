@@ -2,8 +2,10 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
+	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/rs/zerolog/log"
 )
@@ -33,21 +35,21 @@ type GameState interface {
 
 // GameStateProcessor handles the state of the game
 type GameStateProcessor struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	maxPlayers int
 
 	// status is the current GameStatus of the game
 	status GameStatus
 
-	// The current word to guess
-	currentWord string
-
-	// playerStates represents the player states
+	// playerStates represents the userID -> player states mapping
 	playerStates map[string]PlayerState
 
 	// playerOrder represents the order for players (randomized on game start)
 	playerOrder []string
+
+	// The current word to guess
+	currentWord string
 
 	// currentTurn represents the player ID for the current player's turn
 	currentTurn string
@@ -74,8 +76,28 @@ func NewGameStateProcessor(maxPlayers int) GameState {
 func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 	for {
 		select {
-		case _ = <-g.messageQueue:
-			// TODO: unmarshal message as event, send to event handler
+		case msg := <-g.messageQueue:
+			var event events.GameEvent
+			err := json.Unmarshal(msg, &event)
+			if err != nil {
+				log.Error().
+					Bytes("msg", msg).
+					Err(err).
+					Msg("Failed to parse incoming user event")
+			}
+
+			switch event.Type {
+			case events.EventTypeUserJoinLeaveEvent:
+				g.onUserJoinLeaveEvent()
+			case events.EventTypeRehydrate:
+				g.onRehydrateEvent()
+			case events.EventTypeChat:
+				g.onChatEvent(event)
+			case events.EventTypeDraw:
+				g.onDrawEvent(event)
+			default:
+				log.Error().Msg("Unknown event type unmarshalled from incoming user event")
+			}
 		case <-cleanupChan:
 			g.cleanup()
 			return
@@ -115,39 +137,4 @@ func (g *GameStateProcessor) NextTurn() {
 
 func (g *GameStateProcessor) IsFull() bool {
 	return len(g.playerStates) >= g.maxPlayers
-}
-
-func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, connErrChan chan error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	playerState, ok := g.playerStates[user.ID]
-	if ok {
-		// Existing user re-joined the room
-		playerState.SetNewConnection(user)
-	} else {
-		// No player state exists for this user, create a new player state for the current game
-		playerState = NewPlayer(user, g.IsFull())
-		g.playerStates[user.ID] = playerState
-	}
-	playerState.SetConnected(true)
-
-	go user.ReaderLoop(ctx, g.messageQueue, connErrChan)
-	go user.WriterLoop(ctx, connErrChan)
-
-	// TODO: send rehydration event to user who just joined
-	// TODO: broadcast player join event
-}
-
-func (g *GameStateProcessor) UserLeft(userID string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	playerState, ok := g.playerStates[userID]
-	if !ok {
-		return
-	}
-
-	playerState.SetConnected(false)
-	// TODO: broadcast
 }

@@ -15,13 +15,19 @@ func RehydrateUser(user model.User) []byte {
 	event := RehydrateEvent{
 		User: user,
 	}
+	eventBytes, err := json.Marshal(&event)
+	if err != nil {
+		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
+		return nil
+	}
+
 	gameEvent := GameEvent{
 		Type: EventTypeRehydrate,
-		Data: event,
+		Data: eventBytes,
 	}
 	bytes, err := json.Marshal(&gameEvent)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
+		log.Err(err).Msg("Could not marshal RehydrateEvent wrapper into JSON.")
 		return nil
 	}
 	return bytes

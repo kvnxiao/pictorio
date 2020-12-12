@@ -1,5 +1,9 @@
 package events
 
+import (
+	"encoding/json"
+)
+
 type GameEventType int
 
 const (
@@ -10,6 +14,6 @@ const (
 )
 
 type GameEvent struct {
-	Type GameEventType `json:"type"`
-	Data interface{}   `json:"data"`
+	Type GameEventType   `json:"type"`
+	Data json.RawMessage `json:"data"`
 }

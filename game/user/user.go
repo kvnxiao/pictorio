@@ -52,10 +52,17 @@ func (p *User) WriterLoop(ctx context.Context, connErrChan chan error) {
 				connErrChan <- err
 				return
 			}
-			log.Info().Bytes("msg", msg).Str("pid", p.ID).Msg("Wrote message to user")
+			log.Info().
+				Bytes("msg", msg).
+				Str("uid", p.ID).
+				Msg("Wrote message to user")
 		case <-ctx.Done():
 			log.Info().Msg("DONE writer!")
 			return
 		}
 	}
+}
+
+func (p *User) Outgoing() chan<- []byte {
+	return p.outgoing
 }

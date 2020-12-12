@@ -7,15 +7,8 @@ import (
 
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/user"
+	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
-)
-
-type GameStatus int
-
-const (
-	StatusWaitingReadyUp GameStatus = iota
-	StatusStarted
-	StatusGameOver
 )
 
 type GameState interface {
@@ -23,7 +16,7 @@ type GameState interface {
 	Cleanup() <-chan bool
 
 	// Status gets the GameStatus of the current game
-	Status() GameStatus
+	Status() model.GameStatus
 	IsFull() bool
 
 	StartGame()
@@ -40,7 +33,7 @@ type GameStateProcessor struct {
 	maxPlayers int
 
 	// status is the current GameStatus of the game
-	status GameStatus
+	status model.GameStatus
 
 	// playerStates represents the userID -> player states mapping
 	playerStates map[string]PlayerState
@@ -63,7 +56,7 @@ type GameStateProcessor struct {
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
 		maxPlayers:    maxPlayers,
-		status:        StatusWaitingReadyUp,
+		status:        model.StatusWaitingReadyUp,
 		playerStates:  make(map[string]PlayerState),
 		playerOrder:   []string{},
 		messageQueue:  make(chan []byte),
@@ -92,7 +85,13 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 			case events.EventTypeRehydrate:
 				g.onRehydrateEvent()
 			case events.EventTypeChat:
-				g.onChatEvent(event)
+				var chatEvent events.ChatEvent
+				err := json.Unmarshal(event.Data, &chatEvent)
+				if err != nil {
+					log.Error().
+						Err(err).Msg("Could not unmarshal ChatEvent from user")
+				}
+				g.onChatEvent(chatEvent)
 			case events.EventTypeDraw:
 				g.onDrawEvent(event)
 			default:
@@ -120,7 +119,7 @@ func (g *GameStateProcessor) Cleanup() <-chan bool {
 	return g.cleanedUpChan
 }
 
-func (g *GameStateProcessor) Status() GameStatus {
+func (g *GameStateProcessor) Status() model.GameStatus {
 	return g.status
 }
 

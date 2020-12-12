@@ -8,12 +8,15 @@ import (
 )
 
 type RehydrateEvent struct {
-	User model.User `json:"user"`
+	SelfUser        model.User       `json:"selfUser"`
+	GameStatus      model.GameStatus `json:"gameStatus"`
+	CurrentUserTurn *model.User      `json:"currentUserTurn,omitempty"`
+	Lines           []model.Line     `json:"lines"`
 }
 
 func RehydrateUser(user model.User) []byte {
 	event := RehydrateEvent{
-		User: user,
+		SelfUser: user,
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
@@ -21,14 +24,5 @@ func RehydrateUser(user model.User) []byte {
 		return nil
 	}
 
-	gameEvent := GameEvent{
-		Type: EventTypeRehydrate,
-		Data: eventBytes,
-	}
-	bytes, err := json.Marshal(&gameEvent)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal RehydrateEvent wrapper into JSON.")
-		return nil
-	}
-	return bytes
+	return gameEvent(EventTypeRehydrate, eventBytes)
 }

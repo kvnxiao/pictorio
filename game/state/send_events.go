@@ -65,6 +65,7 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 	userModel := playerState.UserModel()
 
 	// send rehydration event to user who just joined
+	// TODO: rehydrate game state
 	playerState.SendMessage(events.RehydrateUser(userModel))
 
 	// broadcast that a user has joined

@@ -63,6 +63,7 @@ func (p *User) WriterLoop(ctx context.Context, connErrChan chan error) {
 	}
 }
 
+// Outgoing returns the writable []byte channel that can be used to send messages to this specific player
 func (p *User) Outgoing() chan<- []byte {
 	return p.outgoing
 }

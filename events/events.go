@@ -9,11 +9,35 @@ import (
 type GameEventType int
 
 const (
-	EventTypeUserJoinLeaveEvent GameEventType = iota
-	EventTypeRehydrate
-	EventTypeChat
-	EventTypeDraw
+	EventTypeUserJoinLeave   GameEventType = iota // server-sourced
+	EventTypeRehydrate                            // server-sourced
+	EventTypeChat                                 // bi-directional
+	EventTypeDraw                                 // bi-directional
+	EventTypeReady                                // bi-directional
+	EventTypeStartGame                            // server-sourced
+	EventTypeStartGameIssued                      // client-sourced
 )
+
+func (e GameEventType) String() string {
+	switch e {
+	case EventTypeUserJoinLeave:
+		return "UserJoinLeaveEvent"
+	case EventTypeRehydrate:
+		return "RehydrateEvent"
+	case EventTypeChat:
+		return "ChatEvent"
+	case EventTypeDraw:
+		return "DrawEvent"
+	case EventTypeReady:
+		return "ReadyEvent"
+	case EventTypeStartGame:
+		return "StartGameEvent"
+	case EventTypeStartGameIssued:
+		return "StartGameIssuedEvent"
+	default:
+		return "UNKNOWN_Event"
+	}
+}
 
 type GameEvent struct {
 	Type GameEventType   `json:"type"`
@@ -30,7 +54,7 @@ func gameEvent(eventType GameEventType, rawEventData json.RawMessage) []byte {
 	}
 	bytes, err := json.Marshal(&gameEvent)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal GameEvent wrapper into JSON.")
+		log.Err(err).Msg("Could not marshal GameEvent<" + eventType.String() + "> wrapper into JSON")
 		return nil
 	}
 	return bytes

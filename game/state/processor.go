@@ -3,7 +3,9 @@ package state
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/state/chat"
@@ -20,7 +22,7 @@ type GameState interface {
 	Status() model.GameStatus
 	IsFull() bool
 
-	StartGame()
+	StartGame() bool
 	NextTurn()
 
 	UserJoined(ctx context.Context, user *user.User, connErrChan chan error)
@@ -62,6 +64,10 @@ type GameStateProcessor struct {
 	cleanedUpChan chan bool
 }
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
 		maxPlayers:    maxPlayers,
@@ -82,7 +88,10 @@ func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
 
 	for _, p := range g.playerStates {
 		playerStates = append(playerStates, model.PlayerState{
-			User:         p.UserModel(),
+			User: model.User{
+				ID:   p.ID(),
+				Name: p.Name(),
+			},
 			Points:       p.Points(),
 			Wins:         p.Wins(),
 			IsSpectator:  p.IsSpectator(),
@@ -93,6 +102,18 @@ func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
 	}
 
 	return playerStates
+}
+
+func (g *GameStateProcessor) readyUser(userID string, ready bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	playerState, ok := g.playerStates[userID]
+	if !ok {
+		log.Error().Msg("Attempted to change ready state on an invalid player ID")
+	}
+
+	playerState.SetReady(ready)
 }
 
 // EventLoop represents the single-threaded game logic, which handles and processes incoming WebSocket messages from
@@ -111,7 +132,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 			}
 
 			switch event.Type {
-			case events.EventTypeUserJoinLeaveEvent:
+			case events.EventTypeUserJoinLeave:
 				g.onUserJoinLeaveEvent()
 			case events.EventTypeRehydrate:
 				g.onRehydrateEvent()
@@ -119,13 +140,31 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var chatEvent events.ChatEvent
 				err := json.Unmarshal(event.Data, &chatEvent)
 				if err != nil {
-					log.Error().
-						Err(err).Msg("Could not unmarshal ChatEvent from user")
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + events.EventTypeChat.String() + " from user")
 				}
 				g.onChatEvent(chatEvent)
 			case events.EventTypeDraw:
 				// TODO: handle draw (lines) event
 				g.onDrawEvent(event)
+			case events.EventTypeReady:
+				var readyEvent events.ReadyEvent
+				err := json.Unmarshal(event.Data, &readyEvent)
+				if err != nil {
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + events.EventTypeReady.String() + " from user")
+				}
+				g.onReadyEvent(readyEvent)
+			case events.EventTypeStartGame:
+				g.onStartGameEvent()
+			case events.EventTypeStartGameIssued:
+				var startGameIssuedEvent events.StartGameIssuedEvent
+				err := json.Unmarshal(event.Data, &startGameIssuedEvent)
+				if err != nil {
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + events.EventTypeStartGameIssued.String() + " from user")
+				}
+				g.onStartGameIssuedEvent(startGameIssuedEvent)
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")
 			}
@@ -156,11 +195,45 @@ func (g *GameStateProcessor) Status() model.GameStatus {
 	return g.status
 }
 
-func (g *GameStateProcessor) StartGame() {
-	panic("implement me")
-	// TODO: check all players are ready
-	// TODO: randomize player turn order
-	// TODO: progress in game event loop
+func (g *GameStateProcessor) StartGame() bool {
+	var userIDsOrder []string
+
+	// Check all players are ready
+	g.mu.RLock()
+	for _, playerState := range g.playerStates {
+		if playerState.IsConnected() && !playerState.IsSpectator() {
+			if !playerState.IsReady() {
+				log.Error().Msg("Attempted to start the game but not all players are ready!")
+				return false
+			}
+			userIDsOrder = append(userIDsOrder, playerState.ID())
+		}
+	}
+	g.mu.RUnlock()
+
+	// Sanity check that the length of ready users is <= room's max capacity
+	numPlayersReady := len(userIDsOrder)
+	if numPlayersReady > g.maxPlayers {
+		log.Error().
+			Int("numPlayersReady", numPlayersReady).
+			Int("maxPlayers", g.maxPlayers).
+			Msg("Number of ready players somehow exceeds the room's max capacity!")
+		return false
+	}
+
+	// Randomize player turn order
+	rand.Shuffle(numPlayersReady, func(i, j int) {
+		userIDsOrder[i], userIDsOrder[j] = userIDsOrder[j], userIDsOrder[i]
+	})
+
+	// Save turn order
+	g.playerOrder = userIDsOrder
+
+	// Notify all users that the game has started
+	g.broadcastEvent(events.StartGame())
+
+	// TODO: progress game state logic with timer
+	return true
 }
 
 func (g *GameStateProcessor) NextTurn() {

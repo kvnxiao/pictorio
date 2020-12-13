@@ -31,7 +31,7 @@ func ChatUserEvent(user model.User, message string) ChatEvent {
 func Chat(event ChatEvent) []byte {
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal ChatEvent into JSON.")
+		log.Err(err).Msg("Could not marshal " + EventTypeChat.String() + " into JSON.")
 		return nil
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/user"
+	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
 )
 
@@ -57,6 +58,9 @@ func (g *GameStateProcessor) saveUserConnection(user *user.User) PlayerState {
 }
 
 func (g *GameStateProcessor) removeUserConnection(userID string) PlayerState {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	playerState, ok := g.playerStates[userID]
 	if !ok {
 		return nil
@@ -73,7 +77,10 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 	go user.ReaderLoop(ctx, g.messageQueue, connErrChan)
 	go user.WriterLoop(ctx, connErrChan)
 
-	userModel := playerState.UserModel()
+	userModel := model.User{
+		ID:   playerState.ID(),
+		Name: playerState.Name(),
+	}
 
 	// send rehydration event to user who just joined
 	// TODO: rehydrate game state
@@ -82,6 +89,7 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 			userModel,
 			g.playerStatesList(),
 			g.chatHistory.GetAll(),
+			g.status,
 		),
 	)
 
@@ -95,7 +103,10 @@ func (g *GameStateProcessor) UserLeft(userID string) {
 
 	// broadcast that a user has left
 	if playerState != nil {
-		userModel := playerState.UserModel()
+		userModel := model.User{
+			ID:   playerState.ID(),
+			Name: playerState.Name(),
+		}
 		g.broadcastEvent(events.UserLeave(userModel))
 		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
 	}

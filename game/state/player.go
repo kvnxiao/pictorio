@@ -2,17 +2,18 @@ package state
 
 import (
 	"github.com/kvnxiao/pictorio/game/user"
-	"github.com/kvnxiao/pictorio/model"
 )
 
 type PlayerState interface {
+	ID() string
+	Name() string
+
 	Points() int
 	Wins() int
 	IsSpectator() bool
 	IsConnected() bool
 	IsReady() bool
 	IsRoomLeader(roomLeaderUserID string) bool
-	UserModel() model.User
 
 	SetNewConnection(user *user.User)
 	SetConnected(connected bool)
@@ -65,11 +66,12 @@ func (p *Player) IsRoomLeader(roomLeaderUserID string) bool {
 	return p.user.ID == roomLeaderUserID
 }
 
-func (p *Player) UserModel() model.User {
-	return model.User{
-		ID:   p.user.ID,
-		Name: p.user.Name,
-	}
+func (p *Player) ID() string {
+	return p.user.ID
+}
+
+func (p *Player) Name() string {
+	return p.user.Name
 }
 
 func (p *Player) SetNewConnection(user *user.User) {

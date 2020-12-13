@@ -21,15 +21,21 @@ type RehydrateEvent struct {
 	Lines           []model.Line     `json:"lines"`
 }
 
-func RehydrateForUser(user model.User, playerStates []model.PlayerState, chatHistory []ChatEvent) []byte {
+func RehydrateForUser(
+	user model.User,
+	playerStates []model.PlayerState,
+	chatHistory []ChatEvent,
+	status model.GameStatus,
+) []byte {
 	event := RehydrateEvent{
 		SelfUser:     user,
 		PlayerStates: playerStates,
 		ChatMessages: chatHistory,
+		GameStatus:   status,
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
+		log.Err(err).Msg("Could not marshal " + EventTypeRehydrate.String() + " into JSON.")
 		return nil
 	}
 

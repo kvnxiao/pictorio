@@ -26,20 +26,11 @@ func joinLeaveEvent(user model.User, action UserJoinLeaveAction) []byte {
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal UserJoinLeaveEvent into JSON.")
+		log.Err(err).Msg("Could not marshal " + EventTypeUserJoinLeave.String() + " into JSON")
 		return nil
 	}
 
-	gameEvent := GameEvent{
-		Type: EventTypeUserJoinLeaveEvent,
-		Data: eventBytes,
-	}
-	bytes, err := json.Marshal(&gameEvent)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal UserJoinLeaveEvent wrapper into JSON.")
-		return nil
-	}
-	return bytes
+	return gameEvent(EventTypeUserJoinLeave, eventBytes)
 }
 
 func UserJoin(user model.User) []byte {

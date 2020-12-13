@@ -30,7 +30,7 @@ func (p *User) ReaderLoop(ctx context.Context, messageQueue chan<- []byte, connE
 		_, readBytes, err := p.conn.Read(ctx)
 		if err != nil {
 			connErrChan <- err
-			log.Info().Msg("DONE reader!")
+			log.Info().Msg("Done ReaderLoop!")
 			return
 		}
 		log.Info().
@@ -52,12 +52,12 @@ func (p *User) WriterLoop(ctx context.Context, connErrChan chan error) {
 				connErrChan <- err
 				return
 			}
-			log.Info().
+			log.Debug().
 				Bytes("msg", msg).
 				Str("uid", p.ID).
 				Msg("Wrote message to user")
 		case <-ctx.Done():
-			log.Info().Msg("DONE writer!")
+			log.Debug().Msg("Done WriterLoop!")
 			return
 		}
 	}

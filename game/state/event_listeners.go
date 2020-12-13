@@ -29,7 +29,7 @@ func (g *GameStateProcessor) onChatEvent(chatEvent events.ChatEvent) {
 	// save event to chat history
 	eventCopy := events.ChatUserEvent(chatEvent.User, chatEvent.Message)
 	g.chatHistory.Append(eventCopy)
-	g.broadcastEvent(events.Chat(eventCopy))
+	g.players.BroadcastEvent(events.Chat(eventCopy))
 }
 
 func (g *GameStateProcessor) onDrawEvent(event events.GameEvent) {
@@ -38,12 +38,12 @@ func (g *GameStateProcessor) onDrawEvent(event events.GameEvent) {
 }
 
 func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {
-	ready := g.readyUser(event.User.ID, event.Ready)
+	ready := g.players.ReadyPlayer(event.User.ID, event.Ready)
 	log.Info().
 		Str("uid", event.User.ID).
 		Bool("ready", ready).
 		Msg("User switched ready state")
-	g.broadcastEvent(events.ReadyUser(event.User, ready))
+	g.players.BroadcastEvent(events.ReadyUser(event.User, ready))
 }
 
 func (g *GameStateProcessor) onStartGameEvent() {
@@ -54,7 +54,7 @@ func (g *GameStateProcessor) onStartGameEvent() {
 
 func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssuedEvent) {
 	// Validate the issuer is the room leader
-	if event.Issuer.ID != g.roomLeaderUserID {
+	if event.Issuer.ID != g.players.RoomLeaderID() {
 		log.Error().
 			Msg("Received a " + events.EventTypeStartGameIssued.String() +
 				" from client who was not the room leader!")
@@ -65,4 +65,5 @@ func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssued
 	if !started {
 		log.Warn().Msg("Failed to start game!")
 	}
+	log.Info().Msg("Game started!")
 }

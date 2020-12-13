@@ -8,16 +8,18 @@ import (
 )
 
 type StartGameEvent struct {
-	GameStarted bool `json:"gameStarted"`
+	PlayerOrderIDs  []string    `json:"playerOrderIds"`
+	CurrentUserTurn *model.User `json:"currentUserTurn"`
 }
 
 type StartGameIssuedEvent struct {
 	Issuer model.User `json:"issuer"`
 }
 
-func StartGame() []byte {
+func StartGame(playerOrderIDs []string, currentUserTurn *model.User) []byte {
 	event := StartGameEvent{
-		GameStarted: true,
+		PlayerOrderIDs:  playerOrderIDs,
+		CurrentUserTurn: currentUserTurn,
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {

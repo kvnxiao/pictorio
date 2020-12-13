@@ -1,9 +1,9 @@
 package model
 
-type GameStatus int
+type GameStateStatus int
 
 const (
-	StatusWaitingReadyUp GameStatus = iota
+	StatusWaitingReadyUp GameStateStatus = iota
 	StatusStarted
 	StatusGameOver
 )

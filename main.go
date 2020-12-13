@@ -2,9 +2,15 @@ package main
 
 import (
 	"flag"
+	"math/rand"
+	"time"
 
 	"github.com/kvnxiao/pictorio/service"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
 	flag.Parse()

@@ -199,13 +199,13 @@ func (r *Room) newUserConnection(ctx context.Context, conn *websocket.Conn) erro
 		Str("uname", u.Name).
 		Msg("Added new user to room")
 
-	r.gameProcessor.UserJoined(ctx, u, connErrChan)
+	r.gameProcessor.HandleUserConnection(ctx, u, connErrChan)
 
 	// blocks on waiting for an error to be sent to the connErrChan.
 	// an error is sent through the channel if a user's connection either fails to be read from or written to
 	err := <-connErrChan
 
-	r.gameProcessor.UserLeft(userModel.ID)
+	r.gameProcessor.RemoveUserConnection(userModel.ID)
 	// user is removed after this function exits due to the defer statement
 
 	return err

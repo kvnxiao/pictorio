@@ -1,4 +1,4 @@
-package state
+package players
 
 import (
 	"github.com/kvnxiao/pictorio/game/user"
@@ -16,13 +16,14 @@ type PlayerState interface {
 	IsReady() bool
 	IsRoomLeader(roomLeaderUserID string) bool
 
-	SetNewConnection(user *user.User)
+	SetNewConnection(u *user.User)
 	SetConnected(connected bool)
 	SetReady(ready bool)
 
 	SendMessage(bytes []byte)
 
 	ToModel(roomLeaderUserID string) model.PlayerState
+	ToUserModel() model.User
 }
 
 type Player struct {
@@ -34,9 +35,9 @@ type Player struct {
 	isReady     bool
 }
 
-func NewPlayer(user *user.User, isSpectator bool) PlayerState {
+func newPlayer(u *user.User, isSpectator bool) PlayerState {
 	return &Player{
-		user:        user,
+		user:        u,
 		points:      0,
 		wins:        0,
 		isSpectator: isSpectator,
@@ -77,8 +78,8 @@ func (p *Player) Name() string {
 	return p.user.Name
 }
 
-func (p *Player) SetNewConnection(user *user.User) {
-	p.user = user
+func (p *Player) SetNewConnection(u *user.User) {
+	p.user = u
 }
 
 func (p *Player) SetConnected(connected bool) {
@@ -105,5 +106,12 @@ func (p *Player) ToModel(roomLeaderUserID string) model.PlayerState {
 		IsConnected:  p.IsConnected(),
 		IsReady:      p.IsReady(),
 		IsRoomLeader: p.IsRoomLeader(roomLeaderUserID),
+	}
+}
+
+func (p *Player) ToUserModel() model.User {
+	return model.User{
+		ID:   p.ID(),
+		Name: p.Name(),
 	}
 }

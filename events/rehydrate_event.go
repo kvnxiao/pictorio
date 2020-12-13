@@ -16,25 +16,31 @@ type RehydrateEvent struct {
 	ChatMessages []ChatEvent `json:"chatMessages"`
 
 	// GameRehydrateEvent
-	MaxPlayers      int              `json:"maxPlayers"`
-	GameStatus      model.GameStatus `json:"gameStatus"`
-	CurrentUserTurn *model.User      `json:"currentUserTurn,omitempty"`
-	Lines           []model.Line     `json:"lines"`
+	MaxPlayers      int                   `json:"maxPlayers"`
+	GameStatus      model.GameStateStatus `json:"gameStatus"`
+	PlayerOrderIDs  []string              `json:"playerOrderIds"`
+	CurrentUserTurn *model.User           `json:"currentUserTurn"`
+	Lines           []model.Line          `json:"lines"`
 }
 
 func RehydrateForUser(
 	user model.User,
 	playerStates []model.PlayerState,
 	chatHistory []ChatEvent,
-	status model.GameStatus,
+	status model.GameStateStatus,
 	maxPlayerCount int,
+	playerOrderIDs []string,
+	currentUserTurn *model.User,
 ) []byte {
 	event := RehydrateEvent{
-		SelfUser:     user,
-		PlayerStates: playerStates,
-		ChatMessages: chatHistory,
-		GameStatus:   status,
-		MaxPlayers:   maxPlayerCount,
+		SelfUser:        user,
+		PlayerStates:    playerStates,
+		ChatMessages:    chatHistory,
+		GameStatus:      status,
+		MaxPlayers:      maxPlayerCount,
+		PlayerOrderIDs:  playerOrderIDs,
+		CurrentUserTurn: currentUserTurn,
+		Lines:           make([]model.Line, 0),
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {

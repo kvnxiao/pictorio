@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand"
-	"sync"
-	"time"
 
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/state/chat"
+	"github.com/kvnxiao/pictorio/game/state/players"
+	"github.com/kvnxiao/pictorio/game/state/status"
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
@@ -18,92 +18,43 @@ type GameState interface {
 	EventProcessor(cleanupChan chan bool)
 	Cleanup() <-chan bool
 
-	// Status gets the GameStatus of the current game
-	Status() model.GameStatus
-	IsFull() bool
+	// Status gets the Status of the current game
+	Status() model.GameStateStatus
 
 	StartGame() bool
 	NextTurn()
 
-	UserJoined(ctx context.Context, user *user.User, connErrChan chan error)
-	UserLeft(userID string)
+	HandleUserConnection(ctx context.Context, user *user.User, connErrChan chan error)
+	RemoveUserConnection(userID string)
 }
 
 // GameStateProcessor handles the state of the game
 type GameStateProcessor struct {
-	mu sync.RWMutex
+	// status is the current Status of the game
+	status status.GameStatus
 
-	maxPlayers int
+	// players represents the userID -> player states mapping
+	players players.Players
 
-	// status is the current GameStatus of the game
-	status model.GameStatus
+	// chatHistory is the chat history since the beginning of the game
+	chatHistory chat.History
 
-	// playerStates represents the userID -> player states mapping
-	playerStates map[string]PlayerState
-
-	// playerOrder stores the order for players (randomized on game start)
-	playerOrder []string
-
-	// roomLeaderUserID is the userID of the user who created the room
-	roomLeaderUserID string
-
-	// currentWord represents the current turn's word to guess
-	currentWord string
-
-	// currentTurn is player ID for the current player's turn
-	currentTurn string
+	// cleanedUpChan represents whether or not the game state has been cleaned up for the current room
+	cleanedUpChan chan bool
 
 	// messageQueue represents the message queue for events incoming from individual user WebSockets, which will be
 	// processed by the EventProcessor method to handle events
 	messageQueue chan []byte
-
-	// chatHistory is the chat history since the beginning of the game
-	chatHistory *chat.Chat
-
-	// cleanedUpChan represents whether or not the game state has been cleaned up for the current room
-	cleanedUpChan chan bool
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
 
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
-		maxPlayers:    maxPlayers,
-		status:        model.StatusWaitingReadyUp,
-		playerStates:  make(map[string]PlayerState),
-		playerOrder:   []string{},
-		messageQueue:  make(chan []byte),
+		status:        status.NewGameStatus(),
+		players:       players.NewPlayerContainer(maxPlayers),
 		chatHistory:   chat.NewChatHistory(),
 		cleanedUpChan: make(chan bool),
+		messageQueue:  make(chan []byte),
 	}
-}
-
-func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	var playerStates []model.PlayerState
-
-	for _, p := range g.playerStates {
-		playerStates = append(playerStates, p.ToModel(g.roomLeaderUserID))
-	}
-
-	return playerStates
-}
-
-func (g *GameStateProcessor) readyUser(userID string, ready bool) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	playerState, ok := g.playerStates[userID]
-	if !ok {
-		log.Error().Msg("Attempted to change ready state on an invalid player ID")
-	}
-
-	playerState.SetReady(ready)
-	return ready
 }
 
 // EventLoop represents the single-threaded game logic, which handles and processes incoming WebSocket messages from
@@ -124,8 +75,10 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 			switch event.Type {
 			case events.EventTypeUserJoinLeave:
 				g.onUserJoinLeaveEvent()
+
 			case events.EventTypeRehydrate:
 				g.onRehydrateEvent()
+
 			case events.EventTypeChat:
 				var chatEvent events.ChatEvent
 				err := json.Unmarshal(event.Data, &chatEvent)
@@ -134,9 +87,11 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 						Msg("Could not unmarshal " + events.EventTypeChat.String() + " from user")
 				}
 				g.onChatEvent(chatEvent)
+
 			case events.EventTypeDraw:
 				// TODO: handle draw (lines) event
 				g.onDrawEvent(event)
+
 			case events.EventTypeReady:
 				var readyEvent events.ReadyEvent
 				err := json.Unmarshal(event.Data, &readyEvent)
@@ -145,8 +100,10 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 						Msg("Could not unmarshal " + events.EventTypeReady.String() + " from user")
 				}
 				g.onReadyEvent(readyEvent)
+
 			case events.EventTypeStartGame:
 				g.onStartGameEvent()
+
 			case events.EventTypeStartGameIssued:
 				var startGameIssuedEvent events.StartGameIssuedEvent
 				err := json.Unmarshal(event.Data, &startGameIssuedEvent)
@@ -155,6 +112,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 						Msg("Could not unmarshal " + events.EventTypeStartGameIssued.String() + " from user")
 				}
 				g.onStartGameIssuedEvent(startGameIssuedEvent)
+
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")
 			}
@@ -181,46 +139,46 @@ func (g *GameStateProcessor) Cleanup() <-chan bool {
 	return g.cleanedUpChan
 }
 
-func (g *GameStateProcessor) Status() model.GameStatus {
-	return g.status
+func (g *GameStateProcessor) Status() model.GameStateStatus {
+	return g.status.Status()
 }
 
 func (g *GameStateProcessor) StartGame() bool {
-	var userIDsOrder []string
-
 	// Check all players are ready
-	g.mu.RLock()
-	for _, playerState := range g.playerStates {
-		if playerState.IsConnected() && !playerState.IsSpectator() {
-			if !playerState.IsReady() {
-				log.Error().Msg("Attempted to start the game but not all players are ready!")
-				return false
-			}
-			userIDsOrder = append(userIDsOrder, playerState.ID())
-		}
+	playerOrderIDs, ok := g.players.AllPlayersReady()
+	if !ok {
+		log.Error().Msg("Attempted to start the game but not all players are ready!")
+		return false
 	}
-	g.mu.RUnlock()
 
 	// Sanity check that the length of ready users is <= room's max capacity
-	numPlayersReady := len(userIDsOrder)
-	if numPlayersReady > g.maxPlayers {
+	numPlayersReady := len(playerOrderIDs)
+	if numPlayersReady > g.players.MaxPlayers() {
 		log.Error().
 			Int("numPlayersReady", numPlayersReady).
-			Int("maxPlayers", g.maxPlayers).
+			Int("maxPlayers", g.players.MaxPlayers()).
 			Msg("Number of ready players somehow exceeds the room's max capacity!")
 		return false
 	}
 
 	// Randomize player turn order
 	rand.Shuffle(numPlayersReady, func(i, j int) {
-		userIDsOrder[i], userIDsOrder[j] = userIDsOrder[j], userIDsOrder[i]
+		playerOrderIDs[i], playerOrderIDs[j] = playerOrderIDs[j], playerOrderIDs[i]
 	})
 
 	// Save turn order
-	g.playerOrder = userIDsOrder
+	g.status.SetPlayerOrderIDs(playerOrderIDs)
+
+	// Get turn order
+	currentPlayerTurn := g.getTurnOrder()
+	if currentPlayerTurn == nil {
+		log.Error().
+			Msg("Player order was computed but the current user turn references an invalid user ID")
+		return false
+	}
 
 	// Notify all users that the game has started
-	g.broadcastEvent(events.StartGame())
+	g.players.BroadcastEvent(events.StartGame(playerOrderIDs, currentPlayerTurn))
 
 	// TODO: progress game state logic with timer
 	return true
@@ -230,6 +188,60 @@ func (g *GameStateProcessor) NextTurn() {
 	panic("implement me")
 }
 
-func (g *GameStateProcessor) IsFull() bool {
-	return len(g.playerStates) >= g.maxPlayers
+func (g *GameStateProcessor) getTurnOrder() *model.User {
+	currentTurnID := g.status.CurrentTurnID()
+	player, _ := g.players.GetPlayer(currentTurnID)
+	if player == nil {
+		return nil
+	}
+
+	userModel := player.ToUserModel()
+	return &userModel
+}
+
+func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *user.User, connErrChan chan error) {
+	// Save user connection
+	player := g.players.SaveConnection(user)
+
+	// Concurrently handle the user's WebSocket connection
+	go user.ReaderLoop(ctx, g.messageQueue, connErrChan)
+	go user.WriterLoop(ctx, connErrChan)
+
+	userModel := model.User{
+		ID:   player.ID(),
+		Name: player.Name(),
+	}
+
+	// Send rehydration event to user who just joined
+	player.SendMessage(
+		events.RehydrateForUser(
+			userModel,
+			g.players.PlayersAsModelList(),
+			g.chatHistory.GetAll(),
+			g.status.Status(),
+			g.players.MaxPlayers(),
+			g.status.PlayerOrderIDs(),
+			g.getTurnOrder(),
+		),
+	)
+
+	// Broadcast that a user has joined
+	g.players.BroadcastEvent(events.UserJoin(player.ToModel(g.players.RoomLeaderID())))
+	userJoinChatEvent := events.ChatSystemEvent(userModel.Name + " has joined the room.")
+	g.chatHistory.Append(userJoinChatEvent)
+	g.players.BroadcastEvent(events.Chat(userJoinChatEvent))
+}
+
+func (g *GameStateProcessor) RemoveUserConnection(userID string) {
+	// Remove user connection
+	player := g.players.RemoveConnection(userID)
+
+	// Broadcast that a user has left
+	if player != nil {
+		userModel := player.ToUserModel()
+		g.players.BroadcastEvent(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
+		userLeftChatEvent := events.ChatSystemEvent(userModel.Name + " has left the room.")
+		g.chatHistory.Append(userLeftChatEvent)
+		g.players.BroadcastEvent(events.Chat(userLeftChatEvent))
+	}
 }

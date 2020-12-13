@@ -87,18 +87,7 @@ func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
 	var playerStates []model.PlayerState
 
 	for _, p := range g.playerStates {
-		playerStates = append(playerStates, model.PlayerState{
-			User: model.User{
-				ID:   p.ID(),
-				Name: p.Name(),
-			},
-			Points:       p.Points(),
-			Wins:         p.Wins(),
-			IsSpectator:  p.IsSpectator(),
-			IsConnected:  p.IsConnected(),
-			IsReady:      p.IsReady(),
-			IsRoomLeader: p.IsRoomLeader(g.roomLeaderUserID),
-		})
+		playerStates = append(playerStates, p.ToModel(g.roomLeaderUserID))
 	}
 
 	return playerStates

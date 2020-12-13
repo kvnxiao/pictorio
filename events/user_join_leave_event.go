@@ -15,14 +15,14 @@ const (
 )
 
 type UserJoinLeaveEvent struct {
-	User   model.User          `json:"user"`
-	Action UserJoinLeaveAction `json:"action"`
+	PlayerState model.PlayerState   `json:"playerState"`
+	Action      UserJoinLeaveAction `json:"action"`
 }
 
-func joinLeaveEvent(user model.User, action UserJoinLeaveAction) []byte {
+func joinLeaveEvent(playerState model.PlayerState, action UserJoinLeaveAction) []byte {
 	event := UserJoinLeaveEvent{
-		User:   user,
-		Action: action,
+		PlayerState: playerState,
+		Action:      action,
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
@@ -33,10 +33,10 @@ func joinLeaveEvent(user model.User, action UserJoinLeaveAction) []byte {
 	return gameEvent(EventTypeUserJoinLeave, eventBytes)
 }
 
-func UserJoin(user model.User) []byte {
-	return joinLeaveEvent(user, UserActionJoin)
+func UserJoin(playerState model.PlayerState) []byte {
+	return joinLeaveEvent(playerState, UserActionJoin)
 }
 
-func UserLeave(user model.User) []byte {
-	return joinLeaveEvent(user, UserActionLeave)
+func UserLeave(playerState model.PlayerState) []byte {
+	return joinLeaveEvent(playerState, UserActionLeave)
 }

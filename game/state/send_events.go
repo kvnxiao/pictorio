@@ -98,7 +98,7 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 	)
 
 	// broadcast that a user has joined
-	g.broadcastEvent(events.UserJoin(userModel))
+	g.broadcastEvent(events.UserJoin(playerState.ToModel(g.roomLeaderUserID)))
 	g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has joined the room."))
 }
 
@@ -111,7 +111,7 @@ func (g *GameStateProcessor) UserLeft(userID string) {
 			ID:   playerState.ID(),
 			Name: playerState.Name(),
 		}
-		g.broadcastEvent(events.UserLeave(userModel))
+		g.broadcastEvent(events.UserLeave(playerState.ToModel(g.roomLeaderUserID)))
 		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/random"
+	"github.com/kvnxiao/pictorio/ws"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
@@ -121,7 +122,7 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Read user's unique ID or generate one if not exist
-	userID, err := cookies.GetUserID(w, req)
+	userID, err := cookies.GetUserID(req)
 	if err != nil || userID == "" {
 		randomID, err := ksuid.NewRandom()
 		if err != nil {
@@ -139,7 +140,7 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Read user name
-	userName, err := cookies.GetUserName(w, req)
+	userName, err := cookies.GetUserName(req)
 	if err != nil || userName == "" {
 		log.Info().Msg("Generating random name for new user")
 		userName = random.GenerateName()
@@ -150,7 +151,7 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 	ctx := context.WithValue(req.Context(), ctxs.KeyUserID, userKSUID)
 	ctx = context.WithValue(ctx, ctxs.KeyUserName, userName)
 
-	conn, err := websocket.Accept(w, req, nil)
+	conn, err := ws.Accept(w, req)
 	if err != nil {
 		log.Err(err).Msg("Could not upgrade connection from user to a WebSocket connection.")
 		return

@@ -5,7 +5,10 @@ else
 endif
 
 build:
-	go build -o $(OUTPUT)
+	go build -tags production -o $(OUTPUT)
+
+dev:
+	go build -tags development -o $(OUTPUT)
 
 lint:
 	golangci-lint run

@@ -18,7 +18,7 @@ func SetUserID(w http.ResponseWriter, id string) {
 	http.SetCookie(w, cookie)
 }
 
-func GetUserID(w http.ResponseWriter, r *http.Request) (string, error) {
+func GetUserID(r *http.Request) (string, error) {
 	c, err := r.Cookie(cookieUserID)
 	if err != nil {
 		switch err {
@@ -44,7 +44,7 @@ func SetUserName(w http.ResponseWriter, name string) {
 	http.SetCookie(w, cookie)
 }
 
-func GetUserName(w http.ResponseWriter, r *http.Request) (string, error) {
+func GetUserName(r *http.Request) (string, error) {
 	c, err := r.Cookie(cookieUserName)
 	if err != nil {
 		switch err {

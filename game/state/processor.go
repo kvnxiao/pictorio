@@ -104,7 +104,7 @@ func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
 	return playerStates
 }
 
-func (g *GameStateProcessor) readyUser(userID string, ready bool) {
+func (g *GameStateProcessor) readyUser(userID string, ready bool) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -114,6 +114,7 @@ func (g *GameStateProcessor) readyUser(userID string, ready bool) {
 	}
 
 	playerState.SetReady(ready)
+	return ready
 }
 
 // EventLoop represents the single-threaded game logic, which handles and processes incoming WebSocket messages from

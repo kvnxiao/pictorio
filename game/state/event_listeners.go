@@ -38,11 +38,12 @@ func (g *GameStateProcessor) onDrawEvent(event events.GameEvent) {
 }
 
 func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {
-	g.readyUser(event.User.ID, event.Ready)
+	ready := g.readyUser(event.User.ID, event.Ready)
 	log.Info().
 		Str("uid", event.User.ID).
-		Bool("ready", event.Ready).
+		Bool("ready", ready).
 		Msg("User switched ready state")
+	g.broadcastEvent(events.ReadyUser(event.User, ready))
 }
 
 func (g *GameStateProcessor) onStartGameEvent() {

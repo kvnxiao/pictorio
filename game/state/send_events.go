@@ -65,7 +65,10 @@ func (g *GameStateProcessor) removeUserConnection(userID string) PlayerState {
 	if !ok {
 		return nil
 	}
+
 	playerState.SetConnected(false)
+	playerState.SetReady(false)
+
 	return playerState
 }
 
@@ -90,6 +93,7 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 			g.playerStatesList(),
 			g.chatHistory.GetAll(),
 			g.status,
+			g.maxPlayers,
 		),
 	)
 

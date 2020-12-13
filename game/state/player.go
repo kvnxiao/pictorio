@@ -11,6 +11,7 @@ type PlayerState interface {
 	IsSpectator() bool
 	IsConnected() bool
 	IsReady() bool
+	IsRoomLeader(roomLeaderUserID string) bool
 	UserModel() model.User
 
 	SetNewConnection(user *user.User)
@@ -58,6 +59,10 @@ func (p *Player) IsSpectator() bool {
 
 func (p *Player) IsReady() bool {
 	return p.isReady
+}
+
+func (p *Player) IsRoomLeader(roomLeaderUserID string) bool {
+	return p.user.ID == roomLeaderUserID
 }
 
 func (p *Player) UserModel() model.User {

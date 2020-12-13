@@ -39,6 +39,10 @@ func (g *GameStateProcessor) saveUserConnection(user *user.User) PlayerState {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	if g.roomLeaderUserID == "" {
+		g.roomLeaderUserID = user.ID
+	}
+
 	playerState, ok := g.playerStates[user.ID]
 	if ok {
 		// Existing user re-joined the room

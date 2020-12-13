@@ -39,17 +39,23 @@ type GameStateProcessor struct {
 	// playerStates represents the userID -> player states mapping
 	playerStates map[string]PlayerState
 
-	// playerOrder represents the order for players (randomized on game start)
+	// playerOrder stores the order for players (randomized on game start)
 	playerOrder []string
 
-	// The current word to guess
+	// roomLeaderUserID is the userID of the user who created the room
+	roomLeaderUserID string
+
+	// currentWord represents the current turn's word to guess
 	currentWord string
 
-	// currentTurn represents the player ID for the current player's turn
+	// currentTurn is player ID for the current player's turn
 	currentTurn string
 
+	// messageQueue represents the message queue for events incoming from individual user WebSockets, which will be
+	// processed by the EventProcessor method to handle events
 	messageQueue chan []byte
 
+	// chatHistory is the chat history since the beginning of the game
 	chatHistory *chat.Chat
 
 	// cleanedUpChan represents whether or not the game state has been cleaned up for the current room
@@ -117,6 +123,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				}
 				g.onChatEvent(chatEvent)
 			case events.EventTypeDraw:
+				// TODO: handle draw (lines) event
 				g.onDrawEvent(event)
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")

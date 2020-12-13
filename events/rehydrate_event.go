@@ -8,15 +8,24 @@ import (
 )
 
 type RehydrateEvent struct {
-	SelfUser        model.User       `json:"selfUser"`
+	// UserRehydrateEvent
+	SelfUser     model.User          `json:"selfUser"`
+	PlayerStates []model.PlayerState `json:"playerStates"`
+
+	// ChatRehydrateEvent
+	ChatMessages []ChatEvent `json:"chatMessages"`
+
+	// GameRehydrateEvent
 	GameStatus      model.GameStatus `json:"gameStatus"`
 	CurrentUserTurn *model.User      `json:"currentUserTurn,omitempty"`
 	Lines           []model.Line     `json:"lines"`
 }
 
-func RehydrateUser(user model.User) []byte {
+func RehydrateForUser(user model.User, playerStates []model.PlayerState, chatHistory []ChatEvent) []byte {
 	event := RehydrateEvent{
-		SelfUser: user,
+		SelfUser:     user,
+		PlayerStates: playerStates,
+		ChatMessages: chatHistory,
 	}
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {

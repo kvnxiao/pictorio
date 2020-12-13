@@ -22,7 +22,9 @@ func (g *GameStateProcessor) onChatEvent(chatEvent events.ChatEvent) {
 		return
 	}
 
-	g.broadcastEvent(events.ChatUser(chatEvent.User, chatEvent.Message))
+	// save event to chat history
+	g.chatHistory.Append(chatEvent)
+	g.broadcastEvent(events.Chat(chatEvent))
 }
 
 func (g *GameStateProcessor) onDrawEvent(event events.GameEvent) {

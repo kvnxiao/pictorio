@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/kvnxiao/pictorio/events"
+	"github.com/kvnxiao/pictorio/game/state/chat"
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
@@ -49,6 +50,8 @@ type GameStateProcessor struct {
 
 	messageQueue chan []byte
 
+	chatHistory *chat.Chat
+
 	// cleanedUpChan represents whether or not the game state has been cleaned up for the current room
 	cleanedUpChan chan bool
 }
@@ -60,8 +63,29 @@ func NewGameStateProcessor(maxPlayers int) GameState {
 		playerStates:  make(map[string]PlayerState),
 		playerOrder:   []string{},
 		messageQueue:  make(chan []byte),
+		chatHistory:   chat.NewChatHistory(),
 		cleanedUpChan: make(chan bool),
 	}
+}
+
+func (g *GameStateProcessor) playerStatesList() []model.PlayerState {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	var playerStates []model.PlayerState
+
+	for _, p := range g.playerStates {
+		playerStates = append(playerStates, model.PlayerState{
+			User:        p.UserModel(),
+			Points:      p.Points(),
+			Wins:        p.Wins(),
+			IsSpectator: p.IsSpectator(),
+			IsConnected: p.IsConnected(),
+			IsReady:     p.IsReady(),
+		})
+	}
+
+	return playerStates
 }
 
 // EventLoop represents the single-threaded game logic, which handles and processes incoming WebSocket messages from
@@ -108,6 +132,7 @@ func (g *GameStateProcessor) cleanup() {
 	log.Info().Msg("Cleaning up game state processor.")
 
 	// TODO: cleanup game state processor
+	g.chatHistory.Clear()
 
 	log.Info().Msg("Done cleaning up game state processor!")
 

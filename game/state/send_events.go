@@ -13,7 +13,9 @@ func (g *GameStateProcessor) broadcastEvent(eventBytes []byte) {
 	defer g.mu.RUnlock()
 
 	for _, playerState := range g.playerStates {
-		playerState.SendMessage(eventBytes)
+		if playerState.IsConnected() {
+			playerState.SendMessage(eventBytes)
+		}
 	}
 }
 
@@ -26,6 +28,11 @@ func (g *GameStateProcessor) sendEvent(userID string, eventBytes []byte) {
 		log.Error().Msg("Attempted to send an event to an invalid player ID")
 	}
 	playerState.SendMessage(eventBytes)
+}
+
+func (g *GameStateProcessor) broadcastChat(chatEvent events.ChatEvent) {
+	g.chatHistory.Append(chatEvent)
+	g.broadcastEvent(events.Chat(chatEvent))
 }
 
 func (g *GameStateProcessor) saveUserConnection(user *user.User) PlayerState {
@@ -66,10 +73,17 @@ func (g *GameStateProcessor) UserJoined(ctx context.Context, user *user.User, co
 
 	// send rehydration event to user who just joined
 	// TODO: rehydrate game state
-	playerState.SendMessage(events.RehydrateUser(userModel))
+	playerState.SendMessage(
+		events.RehydrateForUser(
+			userModel,
+			g.playerStatesList(),
+			g.chatHistory.GetAll(),
+		),
+	)
 
 	// broadcast that a user has joined
 	g.broadcastEvent(events.UserJoin(userModel))
+	g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has joined the room."))
 }
 
 func (g *GameStateProcessor) UserLeft(userID string) {
@@ -77,6 +91,8 @@ func (g *GameStateProcessor) UserLeft(userID string) {
 
 	// broadcast that a user has left
 	if playerState != nil {
-		g.broadcastEvent(events.UserLeave(playerState.UserModel()))
+		userModel := playerState.UserModel()
+		g.broadcastEvent(events.UserLeave(userModel))
+		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
 	}
 }

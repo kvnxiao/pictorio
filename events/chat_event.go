@@ -13,29 +13,25 @@ type ChatEvent struct {
 	IsSystem bool       `json:"isSystem,omitempty"`
 }
 
-func ChatSystem(message string) []byte {
-	event := ChatEvent{
+func ChatSystemEvent(message string) ChatEvent {
+	return ChatEvent{
 		User:     model.SystemUser(),
 		Message:  message,
 		IsSystem: true,
 	}
-	eventBytes, err := json.Marshal(&event)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
-		return nil
-	}
-
-	return gameEvent(EventTypeChat, eventBytes)
 }
 
-func ChatUser(user model.User, message string) []byte {
-	event := ChatEvent{
+func ChatUserEvent(user model.User, message string) ChatEvent {
+	return ChatEvent{
 		User:    user,
 		Message: message,
 	}
+}
+
+func Chat(event ChatEvent) []byte {
 	eventBytes, err := json.Marshal(&event)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal RehydrateEvent into JSON.")
+		log.Err(err).Msg("Could not marshal ChatEvent into JSON.")
 		return nil
 	}
 

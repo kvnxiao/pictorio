@@ -30,10 +30,10 @@ func (p *User) ReaderLoop(ctx context.Context, messageQueue chan<- []byte, connE
 		_, readBytes, err := p.conn.Read(ctx)
 		if err != nil {
 			connErrChan <- err
-			log.Info().Msg("Done ReaderLoop!")
+			log.Debug().Msg("Done ReaderLoop!")
 			return
 		}
-		log.Info().
+		log.Debug().
 			Bytes("msg", readBytes).
 			Str("id", p.ID).
 			Msg("Received message from user")

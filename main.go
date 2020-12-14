@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/kvnxiao/pictorio/service"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -13,11 +15,13 @@ func init() {
 }
 
 func main() {
+	var hostFlag = flag.String("host", ":3000", "The hostname to start the server on")
+	var debugFlag = flag.Bool("debug", false, "Enables debug mode for logging")
+
 	flag.Parse()
 
-	addr := flag.Arg(0)
-	if addr == "" {
-		addr = ":3000"
+	if *debugFlag {
+		log.Level(zerolog.DebugLevel)
 	}
 
 	server := service.NewService()
@@ -25,5 +29,5 @@ func main() {
 		SetupMiddleware().
 		FileServer().
 		RegisterRoutes().
-		Serve(addr)
+		Serve(*hostFlag)
 }

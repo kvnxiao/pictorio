@@ -61,6 +61,13 @@ func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssued
 		return
 	}
 
+	// Validate that the game has not already started
+	if g.status.Status() == model.StatusStarted {
+		log.Error().Msg("Received a " + events.EventTypeStartGameIssued.String() +
+			" event from the room leader, but the game has already started!")
+		return
+	}
+
 	started := g.StartGame()
 	if !started {
 		log.Warn().Msg("Failed to start game!")

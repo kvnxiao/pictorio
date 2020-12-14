@@ -143,6 +143,12 @@ func (g *GameStateProcessor) Status() model.GameStateStatus {
 	return g.status.Status()
 }
 
+func (g *GameStateProcessor) NextTurn() {
+	// Get current turn
+	log.Info().Msg("Starting next turn!")
+	defer log.Info().Msg("Next turn ended")
+}
+
 func (g *GameStateProcessor) StartGame() bool {
 	// Check all players are ready
 	playerOrderIDs, ok := g.players.AllPlayersReady()
@@ -180,12 +186,13 @@ func (g *GameStateProcessor) StartGame() bool {
 	// Notify all users that the game has started
 	g.players.BroadcastEvent(events.StartGame(playerOrderIDs, currentPlayerTurn))
 
-	// TODO: progress game state logic with timer
-	return true
-}
+	// Set status to game started
+	g.status.SetStatus(model.StatusStarted)
 
-func (g *GameStateProcessor) NextTurn() {
-	panic("implement me")
+	// Progress game state logic with timer
+	go g.NextTurn()
+
+	return true
 }
 
 func (g *GameStateProcessor) getTurnOrder() *model.User {

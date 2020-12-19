@@ -7,6 +7,7 @@ import (
 
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/state/chat"
+	"github.com/kvnxiao/pictorio/game/state/drawing"
 	"github.com/kvnxiao/pictorio/game/state/players"
 	"github.com/kvnxiao/pictorio/game/state/status"
 	"github.com/kvnxiao/pictorio/game/user"
@@ -33,6 +34,9 @@ type GameStateProcessor struct {
 	// status is the current Status of the game
 	status status.GameStatus
 
+	// drawing is the current drawing history / state of the game
+	drawing drawing.History
+
 	// players represents the userID -> player states mapping
 	players players.Players
 
@@ -50,6 +54,7 @@ type GameStateProcessor struct {
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
 		status:        status.NewGameStatus(),
+		drawing:       drawing.NewDrawingHistory(),
 		players:       players.NewPlayerContainer(maxPlayers),
 		chatHistory:   chat.NewChatHistory(),
 		cleanedUpChan: make(chan bool),
@@ -89,8 +94,13 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				g.onChatEvent(chatEvent)
 
 			case events.EventTypeDraw:
-				// TODO: handle draw (lines) event
-				g.onDrawEvent(event)
+				var drawEvent events.DrawEvent
+				err := json.Unmarshal(event.Data, &drawEvent)
+				if err != nil {
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + events.EventTypeDraw.String() + " from user")
+				}
+				g.onDrawEvent(drawEvent)
 
 			case events.EventTypeReady:
 				var readyEvent events.ReadyEvent

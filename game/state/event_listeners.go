@@ -32,9 +32,32 @@ func (g *GameStateProcessor) onChatEvent(chatEvent events.ChatEvent) {
 	g.players.BroadcastEvent(events.Chat(eventCopy))
 }
 
-func (g *GameStateProcessor) onDrawEvent(event events.GameEvent) {
-	// TODO: draw event handling
-	log.Info().Msg("onDrawEvent")
+func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
+	// Validate drawing is from current turn's user
+	if g.status.CurrentTurnID() != event.User.ID {
+		log.Error().Msg("Received a " + events.EventTypeDraw.String() +
+			" from a client whose user ID does not match the current turn's ID")
+	}
+
+	// Save event to drawing history
+	switch event.Type {
+	case events.Line:
+		if event.Line == nil {
+			log.Error().Msg("Received a " + events.EventTypeDraw.String() + "[Line] event but the line was nil")
+		}
+		g.drawing.Append(*event.Line)
+	case events.Clear:
+		g.drawing.Clear()
+	case events.Undo:
+		g.drawing.Undo()
+	case events.Redo:
+		g.drawing.Redo()
+	default:
+		log.Error().Msg("Unknown " + events.EventTypeDraw.String() + " event type")
+	}
+
+	// Broadcast event to users
+	g.players.BroadcastEvent(events.Draw(event))
 }
 
 func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {

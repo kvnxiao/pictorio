@@ -7,7 +7,6 @@ import (
 	"regexp"
 
 	"github.com/go-chi/chi"
-	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
 )
 
@@ -21,13 +20,11 @@ func (s *Service) roomIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roomID := chi.URLParam(r, "roomID")
 		if err := validateID(roomID); err != nil {
-			cookies.FlashError(w, "Invalid room ID")
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 		_, ok := s.hub.Room(roomID)
 		if !ok {
-			cookies.FlashError(w, "Invalid room ID")
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}

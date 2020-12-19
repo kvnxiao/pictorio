@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/kvnxiao/pictorio/api"
-	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/hub"
 	"github.com/kvnxiao/pictorio/model"
@@ -60,16 +59,6 @@ func (s *Service) RegisterRoutes() *Service {
 		respErr := response.Json(w, model.RoomResponse{RoomID: roomReq.RoomID, Exists: ok}, http.StatusOK)
 		if respErr != nil {
 			log.Err(respErr).Msg("Unable to encode JSON response")
-		}
-	})
-
-	s.router.Get(api.FlashMessage, func(w http.ResponseWriter, r *http.Request) {
-		msg, err := cookies.ReadError(w, r)
-		if err != nil {
-			log.Err(err).Msg("Failed to read flash error message")
-		}
-		if err := response.Json(w, msg, http.StatusOK); err != nil {
-			log.Err(err).Msg("Unable to encode JSON response")
 		}
 	})
 

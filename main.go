@@ -27,7 +27,6 @@ func main() {
 	server := service.NewService()
 	server.
 		SetupMiddleware().
-		FileServer().
 		RegisterRoutes().
 		Serve(*hostFlag)
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -8,7 +9,6 @@ import (
 	"github.com/kvnxiao/pictorio/api"
 	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
-	"github.com/kvnxiao/pictorio/fileserver"
 	"github.com/kvnxiao/pictorio/hub"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/response"
@@ -36,20 +36,30 @@ func (s *Service) SetupMiddleware() *Service {
 	return s
 }
 
-func (s *Service) FileServer() *Service {
-	for _, file := range fileserver.Files {
-		fileserver.HandleFolder(s.router, file)
-	}
-	return s
-}
-
 func (s *Service) RegisterRoutes() *Service {
-	s.router.NotFound(fileserver.IndexHandler)
-
-	s.router.Post(api.CreateRoom, func(w http.ResponseWriter, r *http.Request) {
+	s.router.Post(api.RoomCreate, func(w http.ResponseWriter, r *http.Request) {
 		ro := s.hub.NewRoom()
 		if err := response.Json(w, model.RoomResponse{RoomID: ro.ID(), Exists: true}, http.StatusOK); err != nil {
 			log.Err(err).Msg("Unable to encode JSON response")
+		}
+	})
+
+	s.router.Post(api.RoomExists, func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		var roomReq model.RoomRequest
+		err := decoder.Decode(&roomReq)
+		if err != nil {
+			respErr := response.Json(w, model.RoomResponse{Exists: false}, http.StatusBadRequest)
+			if respErr != nil {
+				log.Err(respErr).Msg("Unable to encode JSON response")
+			}
+		}
+
+		// Check if room id exists
+		_, ok := s.hub.Room(roomReq.RoomID)
+		respErr := response.Json(w, model.RoomResponse{RoomID: roomReq.RoomID, Exists: ok}, http.StatusOK)
+		if respErr != nil {
+			log.Err(respErr).Msg("Unable to encode JSON response")
 		}
 	})
 
@@ -63,7 +73,7 @@ func (s *Service) RegisterRoutes() *Service {
 		}
 	})
 
-	s.router.Route("/room", func(r chi.Router) {
+	s.router.Route(api.Room, func(r chi.Router) {
 		r.Route("/{roomID}", func(r chi.Router) {
 			r.Use(s.roomIDMiddleware)
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +85,6 @@ func (s *Service) RegisterRoutes() *Service {
 					}
 					return
 				}
-				fileserver.IndexHandler(w, r)
 			})
 			r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()

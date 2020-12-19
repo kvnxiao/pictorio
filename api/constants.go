@@ -3,5 +3,8 @@ package api
 const (
 	baseUrl      = "/api"
 	FlashMessage = baseUrl + "/flash"
-	CreateRoom   = baseUrl + "/create"
+
+	Room       = baseUrl + "/room"
+	RoomCreate = Room + "/create"
+	RoomExists = Room + "/exists"
 )

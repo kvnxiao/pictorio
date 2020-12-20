@@ -2,6 +2,7 @@ package random
 
 import (
 	"bufio"
+	"log"
 	"math/rand"
 	"os"
 )
@@ -9,8 +10,9 @@ import (
 var words []string
 
 func init() {
-	f, err := os.Open("words.txt")
+	f, err := os.Open("assets/words.txt")
 	if err != nil {
+		log.Fatalln("Failed to read list of game words")
 		return
 	}
 

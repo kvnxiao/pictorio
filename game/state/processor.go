@@ -239,6 +239,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 			g.players.MaxPlayers(),
 			g.status.PlayerOrderIDs(),
 			g.getTurnOrder(),
+			g.drawing.GetAll(),
 		),
 	)
 

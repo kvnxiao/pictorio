@@ -107,7 +107,10 @@ func (s *Status) CurrentTurnID() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.playerOrderIDs[s.turnIndex]
+	if len(s.playerOrderIDs) > 0 {
+		return s.playerOrderIDs[s.turnIndex]
+	}
+	return ""
 }
 
 func (s *Status) TurnIndex() int {

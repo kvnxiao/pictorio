@@ -9,13 +9,18 @@ import (
 type GameEventType int
 
 const (
-	EventTypeUserJoinLeave   GameEventType = iota // server-sourced
-	EventTypeRehydrate                            // server-sourced
-	EventTypeChat                                 // bi-directional
-	EventTypeDraw                                 // bi-directional
-	EventTypeReady                                // bi-directional
-	EventTypeStartGame                            // server-sourced
-	EventTypeStartGameIssued                      // client-sourced
+	EventTypeUserJoinLeave      GameEventType = iota // server-sourced
+	EventTypeRehydrate                               // server-sourced
+	EventTypeChat                                    // bi-directional
+	EventTypeDraw                                    // bi-directional
+	EventTypeReady                                   // bi-directional
+	EventTypeStartGame                               // server-sourced
+	EventTypeStartGameIssued                         // client-sourced
+	EventTypeTurnBeginSelection                      // server-sourced
+	EventTypeTurnWordSelected                        // client-sourced
+	EventTypeTurnBeginDrawing                        // server-sourced
+	EventTypeTurnCountdown
+	EventTypeTurnOver
 )
 
 func (e GameEventType) String() string {
@@ -34,6 +39,16 @@ func (e GameEventType) String() string {
 		return "StartGameEvent"
 	case EventTypeStartGameIssued:
 		return "StartGameIssuedEvent"
+	case EventTypeTurnBeginSelection:
+		return "TurnBeginSelectionEvent"
+	case EventTypeTurnWordSelected:
+		return "TurnWordSelectedEvent"
+	case EventTypeTurnBeginDrawing:
+		return "TurnBeginDrawingEvent"
+	case EventTypeTurnCountdown:
+		return "TurnCountdownEvent"
+	case EventTypeTurnOver:
+		return "TurnOverEvent"
 	default:
 		return "UNKNOWN_Event"
 	}

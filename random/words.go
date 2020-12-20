@@ -25,6 +25,6 @@ func init() {
 	_ = f.Close()
 }
 
-func Word() string {
+func GenerateWord() string {
 	return words[rand.Intn(len(words))]
 }

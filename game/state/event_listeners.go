@@ -1,6 +1,8 @@
 package state
 
 import (
+	"time"
+
 	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
@@ -18,18 +20,25 @@ func (g *GameStateProcessor) onRehydrateEvent() {
 		Msg("Received a server-sourced event from a client!")
 }
 
-func (g *GameStateProcessor) onChatEvent(chatEvent events.ChatEvent) {
+func (g *GameStateProcessor) onChatEvent(event events.ChatEvent) {
 	// Do not process chat events from client trying to impersonate the server
-	if chatEvent.User.ID == model.SystemUserID || chatEvent.IsSystem {
+	if event.User.ID == model.SystemUserID || event.IsSystem {
 		log.Error().
 			Msg("Received a " + events.EventTypeChat.String() + " from client with system user ID / name!")
 		return
 	}
 
-	// save event to chat history
-	eventCopy := events.ChatUserEvent(chatEvent.User, chatEvent.Message)
-	g.chatHistory.Append(eventCopy)
-	g.players.BroadcastEvent(events.Chat(eventCopy))
+	// Check if game is in progress and send to guess if so
+	if g.status.Status() == model.StatusStarted && g.status.TurnStatus() == model.TurnDrawing {
+		g.wordGuess <- Guess{
+			User:      event.User,
+			Timestamp: time.Now().UnixNano(),
+			Value:     event.Message,
+		}
+	} else {
+		// Save event to chat history and broadcast
+		g.sendChatAll(events.ChatUserEvent(event.User, event.Message))
+	}
 }
 
 func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {

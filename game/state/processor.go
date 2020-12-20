@@ -20,7 +20,7 @@ type GameState interface {
 	Cleanup() <-chan bool
 
 	// Status gets the Status of the current game
-	Status() model.GameStateStatus
+	Status() model.GameStatus
 
 	StartGame() bool
 	NextTurn()
@@ -49,16 +49,26 @@ type GameStateProcessor struct {
 	// messageQueue represents the message queue for events incoming from individual user WebSockets, which will be
 	// processed by the EventProcessor method to handle events
 	messageQueue chan []byte
+
+	// wordSelectionIndex allows the current turn player to send a TurnSelectionEvent which will be recorded by the
+	// game processor
+	wordSelectionIndex chan SelectionIndex
+
+	// wordGuess allows the message queue to process a ChatEvent as a word guess when the model.GameStatus is started
+	// and the model.TurnStatus is drawing
+	wordGuess chan Guess
 }
 
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
-		status:        status.NewGameStatus(),
-		drawing:       drawing.NewDrawingHistory(),
-		players:       players.NewPlayerContainer(maxPlayers),
-		chatHistory:   chat.NewChatHistory(),
-		cleanedUpChan: make(chan bool),
-		messageQueue:  make(chan []byte),
+		status:             status.NewGameStatus(),
+		drawing:            drawing.NewDrawingHistory(),
+		players:            players.NewPlayerContainer(maxPlayers),
+		chatHistory:        chat.NewChatHistory(),
+		cleanedUpChan:      make(chan bool),
+		messageQueue:       make(chan []byte),
+		wordSelectionIndex: make(chan SelectionIndex),
+		wordGuess:          make(chan Guess),
 	}
 }
 
@@ -145,6 +155,9 @@ func (g *GameStateProcessor) cleanup() {
 	g.drawing = nil
 	g.status = nil
 	g.players = nil
+	close(g.messageQueue)
+	close(g.wordSelectionIndex)
+	close(g.wordGuess)
 
 	// TODO: close channels if necessary
 
@@ -158,14 +171,8 @@ func (g *GameStateProcessor) Cleanup() <-chan bool {
 	return g.cleanedUpChan
 }
 
-func (g *GameStateProcessor) Status() model.GameStateStatus {
+func (g *GameStateProcessor) Status() model.GameStatus {
 	return g.status.Status()
-}
-
-func (g *GameStateProcessor) NextTurn() {
-	// Get current turn
-	log.Info().Msg("Starting next turn!")
-	defer log.Info().Msg("Next turn ended")
 }
 
 func (g *GameStateProcessor) StartGame() bool {
@@ -195,8 +202,8 @@ func (g *GameStateProcessor) StartGame() bool {
 	g.status.SetPlayerOrderIDs(playerOrderIDs)
 
 	// Get turn order
-	currentPlayerTurn := g.getTurnOrder()
-	if currentPlayerTurn == nil {
+	currentPlayerTurn, err := g.getCurrentTurnUser()
+	if err != nil {
 		log.Error().
 			Msg("Player order was computed but the current user turn references an invalid user ID")
 		return false
@@ -209,20 +216,9 @@ func (g *GameStateProcessor) StartGame() bool {
 	g.status.SetStatus(model.StatusStarted)
 
 	// Progress game state logic with timer
-	go g.NextTurn()
+	go g.gameLoop()
 
 	return true
-}
-
-func (g *GameStateProcessor) getTurnOrder() *model.User {
-	currentTurnID := g.status.CurrentTurnID()
-	player, _ := g.players.GetPlayer(currentTurnID)
-	if player == nil {
-		return nil
-	}
-
-	userModel := player.ToUserModel()
-	return &userModel
 }
 
 func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *user.User, connErrChan chan error) {
@@ -238,6 +234,13 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 		Name: player.Name(),
 	}
 
+	// Get current turn user model as a pointer
+	var currentTurnUserPtr *model.User = nil
+	currentTurnUser, err := g.getCurrentTurnUser()
+	if err == nil {
+		currentTurnUserPtr = &currentTurnUser
+	}
+
 	// Send rehydration event to user who just joined
 	player.SendMessage(
 		events.RehydrateForUser(
@@ -247,7 +250,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 			g.status.Status(),
 			g.players.MaxPlayers(),
 			g.status.PlayerOrderIDs(),
-			g.getTurnOrder(),
+			currentTurnUserPtr,
 			g.drawing.GetAll(),
 		),
 	)
@@ -255,8 +258,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 	// Broadcast that a user has joined
 	g.players.BroadcastEvent(events.UserJoin(player.ToModel(g.players.RoomLeaderID())))
 	userJoinChatEvent := events.ChatSystemEvent(userModel.Name + " has joined the room.")
-	g.chatHistory.Append(userJoinChatEvent)
-	g.players.BroadcastEvent(events.Chat(userJoinChatEvent))
+	g.sendChatAll(userJoinChatEvent)
 }
 
 func (g *GameStateProcessor) RemoveUserConnection(userID string) {
@@ -268,7 +270,6 @@ func (g *GameStateProcessor) RemoveUserConnection(userID string) {
 		userModel := player.ToUserModel()
 		g.players.BroadcastEvent(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
 		userLeftChatEvent := events.ChatSystemEvent(userModel.Name + " has left the room.")
-		g.chatHistory.Append(userLeftChatEvent)
-		g.players.BroadcastEvent(events.Chat(userLeftChatEvent))
+		g.sendChatAll(userLeftChatEvent)
 	}
 }

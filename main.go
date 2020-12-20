@@ -7,7 +7,6 @@ import (
 
 	"github.com/kvnxiao/pictorio/service"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -21,7 +20,9 @@ func main() {
 	flag.Parse()
 
 	if *debugFlag {
-		log.Level(zerolog.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
 	server := service.NewService()

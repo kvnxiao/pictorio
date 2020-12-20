@@ -210,10 +210,10 @@ func (g *GameStateProcessor) StartGame() bool {
 	}
 
 	// Notify all users that the game has started
-	g.players.BroadcastEvent(events.StartGame(playerOrderIDs, currentPlayerTurn))
+	g.broadcast(events.StartGameEvent{PlayerOrderIDs: playerOrderIDs, CurrentUserTurn: currentPlayerTurn})
 
 	// Set status to game started
-	g.status.SetStatus(model.StatusStarted)
+	g.status.SetStatus(model.GameStarted)
 
 	// Progress game state logic with timer
 	go g.gameLoop()
@@ -242,7 +242,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 	}
 
 	// Send rehydration event to user who just joined
-	player.SendMessage(
+	g.emit(
 		events.RehydrateForUser(
 			userModel,
 			g.players.PlayersAsModelList(),
@@ -253,23 +253,22 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 			currentTurnUserPtr,
 			g.drawing.GetAll(),
 		),
+		userModel.ID,
 	)
 
-	// Broadcast that a user has joined
-	g.players.BroadcastEvent(events.UserJoin(player.ToModel(g.players.RoomLeaderID())))
-	userJoinChatEvent := events.ChatSystemEvent(userModel.Name + " has joined the room.")
-	g.sendChatAll(userJoinChatEvent)
+	// Broadcast user joined
+	g.broadcast(events.UserJoin(player.ToModel(g.players.RoomLeaderID())))
+	g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has joined the room."))
 }
 
 func (g *GameStateProcessor) RemoveUserConnection(userID string) {
 	// Remove user connection
 	player := g.players.RemoveConnection(userID)
 
-	// Broadcast that a user has left
+	// Broadcast user left
 	if player != nil {
 		userModel := player.ToUserModel()
-		g.players.BroadcastEvent(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
-		userLeftChatEvent := events.ChatSystemEvent(userModel.Name + " has left the room.")
-		g.sendChatAll(userLeftChatEvent)
+		g.broadcast(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
+		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
 	}
 }

@@ -43,7 +43,7 @@ type Status struct {
 
 func NewGameStatus() GameStatus {
 	return &Status{
-		status:         model.StatusWaitingReadyUp,
+		status:         model.GameWaitingReadyUp,
 		turnStatus:     model.TurnSelection,
 		currentWord:    "",
 		currentRound:   1,
@@ -164,7 +164,7 @@ func (s *Status) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.status = model.StatusWaitingReadyUp
+	s.status = model.GameWaitingReadyUp
 	s.currentWord = ""
 	s.currentRound = 1
 	s.turnIndex = 0

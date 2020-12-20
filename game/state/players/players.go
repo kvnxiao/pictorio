@@ -3,6 +3,7 @@ package players
 import (
 	"sync"
 
+	"github.com/kvnxiao/pictorio/events"
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/rs/zerolog/log"
@@ -21,9 +22,9 @@ type Players interface {
 	SaveConnection(u *user.User) PlayerState
 	RemoveConnection(userID string) PlayerState
 
-	BroadcastEvent(eventBytes []byte)
-	BroadcastEventExclude(eventBytes []byte, userID string)
-	SendEvent(eventBytes []byte, userID string)
+	SendEventToAll(event events.SerializableEvent)
+	SendEventToAllExcept(event events.SerializableEvent, userID string)
+	SendEventToUser(event events.SerializableEvent, userID string)
 
 	Cleanup()
 }
@@ -140,7 +141,9 @@ func (s *PlayerStatesMap) RemoveConnection(userID string) PlayerState {
 	return player
 }
 
-func (s *PlayerStatesMap) BroadcastEvent(eventBytes []byte) {
+func (s *PlayerStatesMap) SendEventToAll(event events.SerializableEvent) {
+	eventBytes := events.ToJson(event)
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -151,7 +154,9 @@ func (s *PlayerStatesMap) BroadcastEvent(eventBytes []byte) {
 	}
 }
 
-func (s *PlayerStatesMap) BroadcastEventExclude(eventBytes []byte, userID string) {
+func (s *PlayerStatesMap) SendEventToAllExcept(event events.SerializableEvent, userID string) {
+	eventBytes := events.ToJson(event)
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -162,7 +167,9 @@ func (s *PlayerStatesMap) BroadcastEventExclude(eventBytes []byte, userID string
 	}
 }
 
-func (s *PlayerStatesMap) SendEvent(eventBytes []byte, userID string) {
+func (s *PlayerStatesMap) SendEventToUser(event events.SerializableEvent, userID string) {
+	eventBytes := events.ToJson(event)
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

@@ -19,7 +19,7 @@ import (
 //   -> Award points if drawer guesses drawing correctly
 func (g *GameStateProcessor) gameLoop() {
 	// while game is in started state, continue game loop
-	for g.status.Status() == model.StatusStarted {
+	for g.status.Status() == model.GameStarted {
 		g.NextTurn()
 	}
 }
@@ -46,7 +46,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 			// Send player a decremented TurnCountdown event
 			timeLeftSeconds -= 1
 			if timeLeftSeconds >= 0 {
-				g.players.BroadcastEvent(events.TurnCountdown(currentTurnUser, timeLeftSeconds))
+				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: timeLeftSeconds})
 			}
 		case selectionIndex := <-g.wordSelectionIndex:
 			// Ignore elements from selection index channel if the timestamp is before when startTime was calculated
@@ -73,15 +73,15 @@ func (g *GameStateProcessor) handleGuess(
 	if chosenWord == strings.TrimSpace(guess.Value) {
 		if currentTurnUser.ID == guess.User.ID || guessedPlayers[guess.User.ID] {
 			// Send censored word if user has already guessed the word, or the drawer is trying to send the word
-			g.sendChatAll(events.ChatUserEvent(guess.User, censoredWord))
+			g.broadcastChat(events.ChatUserEvent(guess.User, censoredWord))
 		} else {
 			// First time the user is guessing the word correctly
 			guessedPlayers[guess.User.ID] = true
-			g.sendChatAll(events.ChatSystemEvent(guess.User.Name + " has guessed the word."))
+			g.broadcastChat(events.ChatSystemEvent(guess.User.Name + " has guessed the word."))
 			// TODO: award player with points
 		}
 	} else {
-		g.sendChatAll(events.ChatUserEvent(guess.User, guess.Value))
+		g.broadcastChat(events.ChatUserEvent(guess.User, guess.Value))
 	}
 }
 
@@ -135,8 +135,8 @@ func (g *GameStateProcessor) beginTurnSelection(userModel model.User) ([]string,
 
 	// Send TurnBeginSelection event to current turn player (with the words)
 	// Send TurnBeginSelection event to the other players (without the words)
-	g.players.SendEvent(events.TurnBeginSelectionCurrentPlayer(userModel, maxSelectionTimeSeconds, words), userModel.ID)
-	g.players.BroadcastEventExclude(events.TurnBeginSelection(userModel, maxSelectionTimeSeconds), userModel.ID)
+	g.emit(events.TurnBeginSelectionCurrentPlayer(userModel, maxSelectionTimeSeconds, words), userModel.ID)
+	g.broadcastExcluding(events.TurnBeginSelection(userModel, maxSelectionTimeSeconds), userModel.ID)
 
 	return words, maxSelectionTimeSeconds
 }
@@ -149,19 +149,15 @@ func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, wordLengths 
 
 	// Send TurnBeginDrawing event to current turn player (with the selected word)
 	// Send TurnBeginDrawing event to the other players (without the selected word)
-	g.players.SendEvent(
-		events.TurnBeginDrawingCurrentPlayer(userModel, maxDrawingTimeSeconds, wordLengths, word), userModel.ID,
-	)
-	g.players.BroadcastEventExclude(
-		events.TurnBeginDrawing(userModel, maxDrawingTimeSeconds, wordLengths), userModel.ID,
-	)
+	g.emit(events.TurnBeginDrawingCurrentPlayer(userModel, maxDrawingTimeSeconds, wordLengths, word), userModel.ID)
+	g.broadcastExcluding(events.TurnBeginDrawing(userModel, maxDrawingTimeSeconds, wordLengths), userModel.ID)
 
 	return maxDrawingTimeSeconds
 }
 
 func (g *GameStateProcessor) endTurn(userModel model.User) {
 	g.status.SetTurnStatus(model.TurnEnded)
-	g.players.BroadcastEvent(events.TurnOver(userModel))
+	g.broadcast(events.TurnEndEvent{User: userModel})
 }
 
 // NextTurn begins the next turn by allowing the current turn's user to select a word with a time limit

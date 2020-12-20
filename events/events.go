@@ -2,8 +2,6 @@ package events
 
 import (
 	"encoding/json"
-
-	"github.com/rs/zerolog/log"
 )
 
 type GameEventType int
@@ -19,8 +17,8 @@ const (
 	EventTypeTurnBeginSelection                      // server-sourced
 	EventTypeTurnWordSelected                        // client-sourced
 	EventTypeTurnBeginDrawing                        // server-sourced
-	EventTypeTurnCountdown
-	EventTypeTurnOver
+	EventTypeTurnCountdown                           // server-sourced
+	EventTypeTurnEnd                                 // server-sourced
 )
 
 func (e GameEventType) String() string {
@@ -47,8 +45,8 @@ func (e GameEventType) String() string {
 		return "TurnBeginDrawingEvent"
 	case EventTypeTurnCountdown:
 		return "TurnCountdownEvent"
-	case EventTypeTurnOver:
-		return "TurnOverEvent"
+	case EventTypeTurnEnd:
+		return "TurnEndEvent"
 	default:
 		return "UNKNOWN_Event"
 	}
@@ -57,20 +55,4 @@ func (e GameEventType) String() string {
 type GameEvent struct {
 	Type GameEventType   `json:"type"`
 	Data json.RawMessage `json:"data"`
-}
-
-func gameEvent(eventType GameEventType, rawEventData json.RawMessage) []byte {
-	if rawEventData == nil {
-		return nil
-	}
-	gameEvent := GameEvent{
-		Type: eventType,
-		Data: rawEventData,
-	}
-	bytes, err := json.Marshal(&gameEvent)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal GameEvent<" + eventType.String() + "> wrapper into JSON")
-		return nil
-	}
-	return bytes
 }

@@ -19,24 +19,30 @@ type UserJoinLeaveEvent struct {
 	Action      UserJoinLeaveAction `json:"action"`
 }
 
-func joinLeaveEvent(playerState model.PlayerState, action UserJoinLeaveAction) []byte {
-	event := UserJoinLeaveEvent{
+func (e UserJoinLeaveEvent) RawJSON() json.RawMessage {
+	eventBytes, err := json.Marshal(e)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not marshal " + e.GameEventType().String() + " into JSON.")
+		return nil
+	}
+	return eventBytes
+}
+
+func (e UserJoinLeaveEvent) GameEventType() GameEventType {
+	return EventTypeUserJoinLeave
+}
+
+func joinLeaveEvent(playerState model.PlayerState, action UserJoinLeaveAction) UserJoinLeaveEvent {
+	return UserJoinLeaveEvent{
 		PlayerState: playerState,
 		Action:      action,
 	}
-	eventBytes, err := json.Marshal(&event)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal " + EventTypeUserJoinLeave.String() + " into JSON")
-		return nil
-	}
-
-	return gameEvent(EventTypeUserJoinLeave, eventBytes)
 }
 
-func UserJoin(playerState model.PlayerState) []byte {
+func UserJoin(playerState model.PlayerState) UserJoinLeaveEvent {
 	return joinLeaveEvent(playerState, UserActionJoin)
 }
 
-func UserLeave(playerState model.PlayerState) []byte {
+func UserLeave(playerState model.PlayerState) UserJoinLeaveEvent {
 	return joinLeaveEvent(playerState, UserActionLeave)
 }

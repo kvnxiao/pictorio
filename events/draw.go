@@ -22,12 +22,15 @@ type DrawEvent struct {
 	Type DrawEventType `json:"type"`
 }
 
-func Draw(event DrawEvent) []byte {
-	eventBytes, err := json.Marshal(&event)
+func (e DrawEvent) RawJSON() json.RawMessage {
+	eventBytes, err := json.Marshal(e)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal " + EventTypeDraw.String() + " into JSON.")
+		log.Error().Err(err).Msg("Could not marshal " + e.GameEventType().String() + " into JSON.")
 		return nil
 	}
+	return eventBytes
+}
 
-	return gameEvent(EventTypeDraw, eventBytes)
+func (e DrawEvent) GameEventType() GameEventType {
+	return EventTypeDraw
 }

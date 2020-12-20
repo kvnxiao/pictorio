@@ -23,6 +23,19 @@ type RehydrateEvent struct {
 	Lines           []model.Line     `json:"lines,omitempty"`
 }
 
+func (e RehydrateEvent) RawJSON() json.RawMessage {
+	eventBytes, err := json.Marshal(e)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not marshal " + e.GameEventType().String() + " into JSON.")
+		return nil
+	}
+	return eventBytes
+}
+
+func (e RehydrateEvent) GameEventType() GameEventType {
+	return EventTypeRehydrate
+}
+
 func RehydrateForUser(
 	user model.User,
 	playerStates []model.PlayerState,
@@ -32,8 +45,8 @@ func RehydrateForUser(
 	playerOrderIDs []string,
 	currentTurnUser *model.User,
 	lines []model.Line,
-) []byte {
-	event := RehydrateEvent{
+) RehydrateEvent {
+	return RehydrateEvent{
 		SelfUser:        user,
 		PlayerStates:    playerStates,
 		ChatMessages:    chatHistory,
@@ -43,11 +56,4 @@ func RehydrateForUser(
 		CurrentUserTurn: currentTurnUser,
 		Lines:           lines,
 	}
-	eventBytes, err := json.Marshal(&event)
-	if err != nil {
-		log.Err(err).Msg("Could not marshal " + EventTypeRehydrate.String() + " into JSON.")
-		return nil
-	}
-
-	return gameEvent(EventTypeRehydrate, eventBytes)
 }

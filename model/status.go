@@ -3,9 +3,9 @@ package model
 type GameStatus int
 
 const (
-	StatusWaitingReadyUp GameStatus = iota
-	StatusStarted
-	StatusGameOver
+	GameWaitingReadyUp GameStatus = iota
+	GameStarted
+	GameOver
 )
 
 type TurnStatus int

@@ -105,6 +105,8 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 			if timeLeftSeconds < 0 {
 				// end turn if no more time remaining
 				return
+			} else {
+				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: timeLeftSeconds})
 			}
 		case guess := <-g.wordGuess:
 			// Ignore elements from word guess channel if the timestamp is before when startTime was calculated

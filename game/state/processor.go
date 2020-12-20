@@ -23,7 +23,6 @@ type GameState interface {
 	Status() model.GameStatus
 
 	StartGame() bool
-	NextTurn()
 
 	HandleUserConnection(ctx context.Context, user *user.User, connErrChan chan error)
 	RemoveUserConnection(userID string)

@@ -20,7 +20,7 @@ import (
 func (g *GameStateProcessor) gameLoop() {
 	// while game is in started state, continue game loop
 	for g.status.Status() == model.GameStarted {
-		g.NextTurn()
+		g.nextTurn()
 	}
 }
 
@@ -161,7 +161,7 @@ func (g *GameStateProcessor) endTurn(userModel model.User) {
 }
 
 // NextTurn begins the next turn by allowing the current turn's user to select a word with a time limit
-func (g *GameStateProcessor) NextTurn() {
+func (g *GameStateProcessor) nextTurn() {
 	log.Info().Msg("Starting next turn!")
 	defer log.Info().Msg("Turn ended")
 

@@ -9,7 +9,7 @@ import (
 
 type StartGameEvent struct {
 	PlayerOrderIDs  []string   `json:"playerOrderIds"`
-	CurrentUserTurn model.User `json:"currentUserTurn"`
+	CurrentTurnUser model.User `json:"currentTurnUser"`
 }
 
 func (e StartGameEvent) RawJSON() json.RawMessage {

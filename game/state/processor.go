@@ -209,7 +209,7 @@ func (g *GameStateProcessor) StartGame() bool {
 	}
 
 	// Notify all users that the game has started
-	g.broadcast(events.StartGameEvent{PlayerOrderIDs: playerOrderIDs, CurrentUserTurn: currentPlayerTurn})
+	g.broadcast(events.StartGameEvent{PlayerOrderIDs: playerOrderIDs, CurrentTurnUser: currentPlayerTurn})
 
 	// Set status to game started
 	g.status.SetStatus(model.GameStarted)

@@ -22,7 +22,8 @@ type Players interface {
 	RemoveConnection(userID string) PlayerState
 
 	BroadcastEvent(eventBytes []byte)
-	SendEvent(userID string, eventBytes []byte)
+	BroadcastEventExclude(eventBytes []byte, userID string)
+	SendEvent(eventBytes []byte, userID string)
 }
 
 type PlayerStatesMap struct {
@@ -148,7 +149,18 @@ func (s *PlayerStatesMap) BroadcastEvent(eventBytes []byte) {
 	}
 }
 
-func (s *PlayerStatesMap) SendEvent(userID string, eventBytes []byte) {
+func (s *PlayerStatesMap) BroadcastEventExclude(eventBytes []byte, userID string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, player := range s.players {
+		if player.IsConnected() && player.ID() != userID {
+			player.SendMessage(eventBytes)
+		}
+	}
+}
+
+func (s *PlayerStatesMap) SendEvent(eventBytes []byte, userID string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

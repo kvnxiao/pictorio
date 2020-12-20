@@ -136,8 +136,17 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 func (g *GameStateProcessor) cleanup() {
 	log.Info().Msg("Cleaning up game state processor.")
 
-	// TODO: cleanup game state processor
+	// Cleanup game state processor
 	g.chatHistory.Clear()
+	g.drawing.Clear()
+	g.status.Cleanup()
+	g.players.Cleanup()
+	g.chatHistory = nil
+	g.drawing = nil
+	g.status = nil
+	g.players = nil
+
+	// TODO: close channels if necessary
 
 	log.Info().Msg("Done cleaning up game state processor!")
 

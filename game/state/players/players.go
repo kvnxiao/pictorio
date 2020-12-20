@@ -24,6 +24,8 @@ type Players interface {
 	BroadcastEvent(eventBytes []byte)
 	BroadcastEventExclude(eventBytes []byte, userID string)
 	SendEvent(eventBytes []byte, userID string)
+
+	Cleanup()
 }
 
 type PlayerStatesMap struct {
@@ -169,4 +171,13 @@ func (s *PlayerStatesMap) SendEvent(eventBytes []byte, userID string) {
 		log.Error().Msg("Attempted to send an event to an invalid player ID")
 	}
 	player.SendMessage(eventBytes)
+}
+
+func (s *PlayerStatesMap) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k := range s.players {
+		delete(s.players, k)
+	}
 }

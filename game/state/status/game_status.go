@@ -17,6 +17,8 @@ type GameStatus interface {
 
 	PlayerOrderIDs() []string
 	SetPlayerOrderIDs(playerOrderIDs []string)
+
+	Cleanup()
 }
 
 type Status struct {
@@ -84,4 +86,14 @@ func (s *Status) SetPlayerOrderIDs(playerOrderIDs []string) {
 
 	s.playerOrderIDs = playerOrderIDs
 	s.currentTurnID = playerOrderIDs[0]
+}
+
+func (s *Status) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.status = model.StatusWaitingReadyUp
+	s.currentWord = ""
+	s.currentTurnID = ""
+	s.playerOrderIDs = nil
 }

@@ -1,13 +1,14 @@
-package random
+package words
 
 import (
 	"bufio"
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 )
 
-var words []string
+var wordBank []string
 
 func init() {
 	f, err := os.Open("assets/words.txt")
@@ -17,16 +18,15 @@ func init() {
 	}
 
 	scanner := bufio.NewScanner(f)
-
 	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
-		words = append(words, scanner.Text())
+		wordBank = append(wordBank, strings.TrimSpace(scanner.Text()))
 	}
 
 	_ = f.Close()
 }
 
 func GenerateWord() string {
-	return words[rand.Intn(len(words))]
+	return wordBank[rand.Intn(len(wordBank))]
 }

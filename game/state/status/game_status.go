@@ -5,7 +5,7 @@ import (
 
 	"github.com/kvnxiao/pictorio/game/settings"
 	"github.com/kvnxiao/pictorio/model"
-	"github.com/kvnxiao/pictorio/random"
+	"github.com/kvnxiao/pictorio/words"
 )
 
 type GameStatus interface {
@@ -14,8 +14,8 @@ type GameStatus interface {
 	TurnStatus() model.TurnStatus
 	SetTurnStatus(turnStatus model.TurnStatus)
 
-	CurrentWord() string
-	SetCurrentWord(word string)
+	CurrentWord() words.GameWord
+	SetCurrentWord(word words.GameWord)
 	CurrentRound() int
 
 	CurrentTurnID() string
@@ -34,7 +34,7 @@ type Status struct {
 	mu             sync.RWMutex
 	status         model.GameStatus
 	turnStatus     model.TurnStatus
-	currentWord    string
+	currentWord    words.GameWord
 	currentRound   int
 	playerOrderIDs []string
 	turnIndex      int
@@ -45,7 +45,7 @@ func NewGameStatus() GameStatus {
 	return &Status{
 		status:         model.GameWaitingReadyUp,
 		turnStatus:     model.TurnSelection,
-		currentWord:    "",
+		currentWord:    words.GameWord{},
 		currentRound:   1,
 		playerOrderIDs: nil,
 		turnIndex:      0,
@@ -81,19 +81,19 @@ func (s *Status) SetTurnStatus(turnStatus model.TurnStatus) {
 	s.turnStatus = turnStatus
 }
 
-func (s *Status) CurrentWord() string {
+func (s *Status) CurrentWord() words.GameWord {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.currentWord
 }
 
-func (s *Status) SetCurrentWord(word string) {
+func (s *Status) SetCurrentWord(word words.GameWord) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.currentWord = word
-	s.wordHistory[word] = true
+	s.wordHistory[word.Word()] = true
 }
 
 func (s *Status) CurrentRound() int {
@@ -152,15 +152,15 @@ func (s *Status) GenerateWords() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var words []string
-	for len(words) < settings.MaxSelectableWords {
-		word := random.GenerateWord()
+	var w []string
+	for len(w) < settings.MaxSelectableWords {
+		word := words.GenerateWord()
 		if !s.wordHistory[word] {
-			words = append(words, word)
+			w = append(w, word)
 		}
 	}
 
-	return words
+	return w
 }
 
 func (s *Status) Cleanup() {
@@ -168,7 +168,8 @@ func (s *Status) Cleanup() {
 	defer s.mu.Unlock()
 
 	s.status = model.GameWaitingReadyUp
-	s.currentWord = ""
+	s.turnStatus = model.TurnSelection
+	s.currentWord = words.GameWord{}
 	s.currentRound = 1
 	s.turnIndex = 0
 	s.playerOrderIDs = nil

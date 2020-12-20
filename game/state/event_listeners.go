@@ -56,13 +56,13 @@ func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
 		if event.Line == nil {
 			log.Error().Msg("Received a " + event.GameEventType().String() + "[Line] event but the line was nil")
 		}
-		handled = g.drawing.Append(*event.Line)
+		handled = g.drawingHistory.Append(*event.Line)
 	case events.Clear:
-		handled = g.drawing.Clear()
+		handled = g.drawingHistory.Clear()
 	case events.Undo:
-		handled = g.drawing.Undo()
+		handled = g.drawingHistory.Undo()
 	case events.Redo:
-		handled = g.drawing.Redo()
+		handled = g.drawingHistory.Redo()
 	default:
 		log.Error().Msg("Unknown " + event.GameEventType().String() + " event type")
 	}

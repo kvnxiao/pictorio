@@ -33,11 +33,11 @@ type GameStateProcessor struct {
 	// status is the current Status of the game
 	status status.GameStatus
 
-	// drawing is the current drawing history / state of the game
-	drawing drawing.History
-
 	// players represents the userID -> player states mapping
 	players players.Players
+
+	// drawingHistory is the current drawing history of the game
+	drawingHistory drawing.History
 
 	// chatHistory is the chat history since the beginning of the game
 	chatHistory chat.History
@@ -61,8 +61,8 @@ type GameStateProcessor struct {
 func NewGameStateProcessor(maxPlayers int) GameState {
 	return &GameStateProcessor{
 		status:             status.NewGameStatus(),
-		drawing:            drawing.NewDrawingHistory(),
 		players:            players.NewPlayerContainer(maxPlayers),
+		drawingHistory:     drawing.NewDrawingHistory(),
 		chatHistory:        chat.NewChatHistory(),
 		cleanedUpChan:      make(chan bool),
 		messageQueue:       make(chan []byte),
@@ -147,11 +147,11 @@ func (g *GameStateProcessor) cleanup() {
 
 	// Cleanup game state processor
 	g.chatHistory.Clear()
-	g.drawing.Clear()
+	g.drawingHistory.Clear()
 	g.status.Cleanup()
 	g.players.Cleanup()
 	g.chatHistory = nil
-	g.drawing = nil
+	g.drawingHistory = nil
 	g.status = nil
 	g.players = nil
 	close(g.messageQueue)
@@ -250,7 +250,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 			g.players.MaxPlayers(),
 			g.status.PlayerOrderIDs(),
 			currentTurnUserPtr,
-			g.drawing.GetAll(),
+			g.drawingHistory.GetAll(),
 		),
 		userModel.ID,
 	)

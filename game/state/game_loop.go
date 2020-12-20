@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"time"
@@ -13,16 +14,86 @@ import (
 )
 
 // gameLoop describes the game loop
-// When game starts:
-//   -> First drawer's turn gets some short duration to choose a randomly generated word
-//   -> First drawer begins their drawing with a 60 second time limit
-//      |-> Other users guess while first drawer is drawing
-//   -> Award points if drawer guesses drawing correctly
+//
+// Game loop summary:
+//   1. Get current turn's player state (the player who is drawing)
+//   -> If current drawer is in the game as a player but is disconnected during this process, skip this player's turn
+//      ^go to 6.
+//   2. Begin word selection
+//      -> Drawer has some short duration to choose a randomly generated word
+//   3. Wait for word selection
+//      Either:
+//        -> Drawer selects a word from the list of randomly generated words
+//        -> Drawer waits for timeout
+//   4. Begin drawing
+//      -> Drawer is given a time limit to draw
+//   5. Wait for guesses or drawer to timeout
+//      -> Hides the chosen word from chat
+//   	-> Award points if other players guesses drawing correctly
+//      -> Censors the chat message for players who have already guessed the word correctly
+//      -> Censors the chat message from the drawer if they try to "cheat" and type out their chosen word
+//   6. End current turn
+//      -> Sets the next drawer's turn
+//      -> Increments the round counter if the next turn loops back around to the first player
+//   7. End game loop if round counter reaches max rounds
 func (g *GameStateProcessor) gameLoop() {
 	// while game is in started state, continue game loop
 	for g.status.Status() == model.GameStarted {
-		g.nextTurn()
+		log.Info().Msg("Starting next turn!")
+
+		// 1. Get drawer, skip if disconnected during this check
+		userModel, isConnected, err := g.getDrawerPlayer()
+		if err != nil {
+			log.Error().Msg("Failed to get current turn's player state")
+			return
+		}
+		if !isConnected {
+			if userModel.ID == "" {
+				log.Error().Msg("Current turn player is not connected but user ID was invalid")
+				return
+			}
+			g.endTurn(userModel)
+			continue
+		}
+
+		// 2. Begin word selection
+		generatedWords, maxSelectionTimeSeconds := g.beginWordSelection(userModel)
+		log.Info().Strs("words", generatedWords).Msg("Generated random words")
+
+		// 3. Wait for word selection
+		selectedWord := g.waitForSelectedWord(userModel, generatedWords, maxSelectionTimeSeconds)
+		word := words.NewGameWord(selectedWord)
+		g.status.SetCurrentWord(word)
+		log.Info().Str("word", word.Word()).Ints("wordLength", word.WordLength()).Msg("Word selected")
+
+		// 4. Begin turn drawing
+		maxDrawingTimeSeconds := g.beginTurnDrawing(userModel, word)
+
+		// 5. Wait for player guesses, or timeout from current turn player drawing
+		g.waitForGuessOrTimeout(userModel, maxDrawingTimeSeconds)
+
+		// 6. End current turn
+		g.endTurn(userModel)
+
+		log.Info().Msg("Turn ended")
+
+		// 7. Check rounds to end game loop
+		if g.checkRounds() {
+			// game over
+			g.gameOver()
+			break
+		}
 	}
+}
+
+func (g *GameStateProcessor) getDrawerPlayer() (model.User, bool, error) {
+	currentTurnID := g.status.CurrentTurnID()
+	player, ok := g.players.GetPlayer(currentTurnID)
+	if !ok {
+		return model.User{}, false, errors.New("could not get player state with invalid user id for current turn")
+	}
+
+	return player.ToUserModel(), player.IsConnected(), nil
 }
 
 func (g *GameStateProcessor) waitForSelectedWord(
@@ -125,8 +196,8 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 	}
 }
 
-// beginTurnSelection starts the turn selection
-func (g *GameStateProcessor) beginTurnSelection(userModel model.User) ([]string, int) {
+// beginWordSelection starts the word selection process for the current turn
+func (g *GameStateProcessor) beginWordSelection(userModel model.User) ([]string, int) {
 	g.status.SetTurnStatus(model.TurnSelection)
 
 	// Generate random word list (words that have not been recorded yet)
@@ -161,37 +232,17 @@ func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, word words.G
 func (g *GameStateProcessor) endTurn(userModel model.User) {
 	g.status.SetTurnStatus(model.TurnEnded)
 	g.broadcast(events.TurnEndEvent{User: userModel})
+
+	// TODO: increment current turn to the next user
+	// TODO: increment round counter if next turn loops back
 }
 
-// NextTurn begins the next turn by allowing the current turn's user to select a word with a time limit
-func (g *GameStateProcessor) nextTurn() {
-	log.Info().Msg("Starting next turn!")
-	defer log.Info().Msg("Turn ended")
+// checkRounds returns a boolean of whether the rounds played has exceeded the maximum number of rounds to be played
+func (g *GameStateProcessor) checkRounds() bool {
+	// TODO: check rounds to end the game loop
+	return false
+}
 
-	// Get current turn user
-	userModel, err := g.getCurrentTurnUser()
-	if err != nil {
-		log.Error().Msg("Failed to get current turn's player state")
-		return
-	}
+func (g *GameStateProcessor) gameOver() {
 
-	// Begin turn selection
-	generatedWords, maxSelectionTimeSeconds := g.beginTurnSelection(userModel)
-	log.Info().Strs("words", generatedWords).Msg("Generated random words")
-
-	// Wait for word selection from current turn player, and save the current word
-	selectedWord := g.waitForSelectedWord(userModel, generatedWords, maxSelectionTimeSeconds)
-	word := words.NewGameWord(selectedWord)
-	log.Info().Str("word", word.Word()).Ints("wordLength", word.WordLength()).Msg("Word selected")
-
-	g.status.SetCurrentWord(word)
-
-	// Begin turn drawing
-	maxDrawingTimeSeconds := g.beginTurnDrawing(userModel, word)
-
-	// Wait for player guesses, or timeout from current turn player drawing
-	g.waitForGuessOrTimeout(userModel, maxDrawingTimeSeconds)
-
-	// End current turn
-	g.endTurn(userModel)
 }

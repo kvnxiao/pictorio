@@ -41,24 +41,27 @@ func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
 	}
 
 	// Save event to drawing history
+	handled := false
 	switch event.Type {
 	case events.Line:
 		if event.Line == nil {
 			log.Error().Msg("Received a " + events.EventTypeDraw.String() + "[Line] event but the line was nil")
 		}
-		g.drawing.Append(*event.Line)
+		handled = g.drawing.Append(*event.Line)
 	case events.Clear:
-		g.drawing.Clear()
+		handled = g.drawing.Clear()
 	case events.Undo:
-		g.drawing.Undo()
+		handled = g.drawing.Undo()
 	case events.Redo:
-		g.drawing.Redo()
+		handled = g.drawing.Redo()
 	default:
 		log.Error().Msg("Unknown " + events.EventTypeDraw.String() + " event type")
 	}
 
 	// Broadcast event to users
-	g.players.BroadcastEventExclude(events.Draw(event), event.User.ID)
+	if handled {
+		g.players.BroadcastEventExclude(events.Draw(event), event.User.ID)
+	}
 }
 
 func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {

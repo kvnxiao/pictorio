@@ -8,15 +8,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (g *GameStateProcessor) onUserJoinLeaveEvent() {
+func (g *GameStateProcessor) warnServerSourcedEvent(eventType events.GameEventType) {
 	log.Warn().
-		Str("event", events.EventTypeUserJoinLeave.String()).
-		Msg("Received a server-sourced event from a client!")
-}
-
-func (g *GameStateProcessor) onRehydrateEvent() {
-	log.Warn().
-		Str("event", events.EventTypeRehydrate.String()).
+		Str("event", eventType.String()).
 		Msg("Received a server-sourced event from a client!")
 }
 
@@ -78,12 +72,6 @@ func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {
 	g.broadcast(events.ReadyEvent{User: event.User, Ready: ready})
 }
 
-func (g *GameStateProcessor) onStartGameEvent() {
-	log.Warn().
-		Str("event", events.EventTypeStartGame.String()).
-		Msg("Received a server-sourced event from a client!")
-}
-
 func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssuedEvent) {
 	// Validate the issuer is the room leader
 	if event.Issuer.ID != g.players.RoomLeaderID() {
@@ -105,4 +93,19 @@ func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssued
 		log.Warn().Msg("Failed to start game!")
 	}
 	log.Info().Msg("Game started!")
+}
+
+func (g *GameStateProcessor) onTurnWordSelectedEvent(event events.TurnWordSelectedEvent) {
+	// Validate the user who sent this event is the current turn's user
+	if event.User.ID != g.status.CurrentTurnID() {
+		log.Error().Msg("Received a " + events.EventTypeTurnWordSelected.String() +
+			" event from a player who's turn is not the current turn.")
+		return
+	}
+
+	g.wordSelectionIndex <- SelectionIndex{
+		User:      event.User,
+		Timestamp: time.Now().UnixNano(),
+		Value:     event.Index,
+	}
 }

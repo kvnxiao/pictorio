@@ -88,17 +88,20 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 
 			switch event.Type {
 			case events.EventTypeUserJoinLeave:
-				g.onUserJoinLeaveEvent()
-
 			case events.EventTypeRehydrate:
-				g.onRehydrateEvent()
+			case events.EventTypeStartGame:
+			case events.EventTypeTurnBeginSelection:
+			case events.EventTypeTurnBeginDrawing:
+			case events.EventTypeTurnCountdown:
+			case events.EventTypeTurnEnd:
+				g.warnServerSourcedEvent(event.Type)
 
 			case events.EventTypeChat:
 				var chatEvent events.ChatEvent
 				err := json.Unmarshal(event.Data, &chatEvent)
 				if err != nil {
 					log.Error().Err(err).
-						Msg("Could not unmarshal " + events.EventTypeChat.String() + " from user")
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onChatEvent(chatEvent)
 
@@ -107,7 +110,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				err := json.Unmarshal(event.Data, &drawEvent)
 				if err != nil {
 					log.Error().Err(err).
-						Msg("Could not unmarshal " + events.EventTypeDraw.String() + " from user")
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onDrawEvent(drawEvent)
 
@@ -116,21 +119,27 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				err := json.Unmarshal(event.Data, &readyEvent)
 				if err != nil {
 					log.Error().Err(err).
-						Msg("Could not unmarshal " + events.EventTypeReady.String() + " from user")
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onReadyEvent(readyEvent)
-
-			case events.EventTypeStartGame:
-				g.onStartGameEvent()
 
 			case events.EventTypeStartGameIssued:
 				var startGameIssuedEvent events.StartGameIssuedEvent
 				err := json.Unmarshal(event.Data, &startGameIssuedEvent)
 				if err != nil {
 					log.Error().Err(err).
-						Msg("Could not unmarshal " + events.EventTypeStartGameIssued.String() + " from user")
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onStartGameIssuedEvent(startGameIssuedEvent)
+
+			case events.EventTypeTurnWordSelected:
+				var turnWordSelectedEvent events.TurnWordSelectedEvent
+				err := json.Unmarshal(event.Data, &turnWordSelectedEvent)
+				if err != nil {
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onTurnWordSelectedEvent(turnWordSelectedEvent)
 
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")

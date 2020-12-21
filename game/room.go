@@ -89,9 +89,14 @@ func (r *Room) Count() int {
 
 // Cleanup sends a clean-up signal to the running eventLoop which stops handling new messages, and also sets the room's
 // closed state to true, so that the room will not accept new WebSocket connections.
-func (r *Room) Cleanup() {
+func (r *Room) Cleanup() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// Do not clean up games that are still in progress
+	if r.gameProcessor.Status() == model.GameStarted {
+		return false
+	}
 
 	// get cleanup channel from game processor
 	gameProcessorCleanup := r.gameProcessor.Cleanup()
@@ -104,6 +109,8 @@ func (r *Room) Cleanup() {
 
 	// set status of room to closed
 	r.closed = true
+
+	return true
 }
 
 func (r *Room) isClosed() bool {

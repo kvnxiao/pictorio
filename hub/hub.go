@@ -49,8 +49,9 @@ func (h *Hub) roomCleanupListener(r *game.Room) {
 	everyMinute := time.NewTicker(1 * time.Minute)
 	for range everyMinute.C {
 		if r.Count() == 0 {
-			r.Cleanup()
-			break
+			if r.Cleanup() {
+				break
+			}
 		}
 	}
 	log.Info().Str("roomID", r.ID()).Msg("Removing empty room from hub.")

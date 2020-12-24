@@ -12,6 +12,7 @@ type GameStatus interface {
 	Summary(selfUserIsCurrentTurn bool) model.GameStateSummary
 
 	MaxRounds() int
+	MaxNextUpTimeSeconds() int
 	MaxSelectionTimeSeconds() int
 	MaxTurnTimeSeconds() int
 	CurrentRound() int
@@ -40,30 +41,32 @@ type GameStatus interface {
 }
 
 type Status struct {
-	mu             sync.RWMutex
-	maxRounds      int
-	currentRound   int
-	status         model.GameStatus
-	turnStatus     model.TurnStatus
-	currentWord    words.GameWord
-	playerOrderIDs []string
-	turnIndex      int
-	wordHistory    map[string]bool
-
-	// Temporary
+	mu               sync.RWMutex
+	maxRounds        int
+	maxNextUpTime    int
 	maxSelectionTime int
 	maxTurnTime      int
-	timeLeftSeconds  int
-	wordSelections   []string
+	currentRound     int
+	status           model.GameStatus
+	turnStatus       model.TurnStatus
+	currentWord      words.GameWord
+	playerOrderIDs   []string
+	turnIndex        int
+	wordHistory      map[string]bool
+
+	// Temporary
+	timeLeftSeconds int
+	wordSelections  []string
 }
 
-func NewGameStatus(maxRounds int, maxSelectionSeconds int, maxTurnSeconds int) GameStatus {
+func NewGameStatus(maxRounds int, maxNextUpTime int, maxSelectionSeconds int, maxTurnSeconds int) GameStatus {
 	return &Status{
 		// required fields
 		maxRounds:        maxRounds,
+		maxNextUpTime:    maxNextUpTime,
 		maxSelectionTime: maxSelectionSeconds,
 		maxTurnTime:      maxTurnSeconds,
-		currentRound:     1,
+		currentRound:     0,
 		status:           model.GameWaitingReadyUp,
 		turnStatus:       model.TurnSelection,
 		currentWord:      words.GameWord{},
@@ -82,7 +85,7 @@ func (s *Status) Summary(selfUserIsCurrentTurn bool) model.GameStateSummary {
 	defer s.mu.RUnlock()
 
 	wordSelections := s.wordSelections
-	if s.turnStatus == model.TurnSelection {
+	if s.turnStatus != model.TurnSelection {
 		wordSelections = nil
 	}
 
@@ -93,6 +96,7 @@ func (s *Status) Summary(selfUserIsCurrentTurn bool) model.GameStateSummary {
 
 	return model.GameStateSummary{
 		MaxRounds:        s.maxRounds,
+		MaxNextUpTime:    s.maxNextUpTime,
 		MaxSelectionTime: s.maxSelectionTime,
 		MaxTurnTime:      s.maxTurnTime,
 		Round:            s.currentRound,
@@ -156,6 +160,13 @@ func (s *Status) MaxRounds() int {
 	defer s.mu.RUnlock()
 
 	return s.maxRounds
+}
+
+func (s *Status) MaxNextUpTimeSeconds() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.maxNextUpTime
 }
 
 func (s *Status) MaxSelectionTimeSeconds() int {

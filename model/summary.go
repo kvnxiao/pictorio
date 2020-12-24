@@ -8,6 +8,7 @@ type WordSummary struct {
 
 type GameStateSummary struct {
 	MaxRounds        int `json:"maxRounds"`
+	MaxNextUpTime    int `json:"maxNextUpTime"`
 	MaxSelectionTime int `json:"maxSelectionTime"`
 	MaxTurnTime      int `json:"maxTurnTime"`
 	Round            int `json:"round"`

@@ -14,6 +14,7 @@ const (
 	EventTypeReady                                   // bi-directional
 	EventTypeStartGame                               // server-sourced
 	EventTypeStartGameIssued                         // client-sourced
+	EventTypeTurnDrawingNext                         // server-sourced
 	EventTypeTurnBeginSelection                      // server-sourced
 	EventTypeTurnWordSelected                        // client-sourced
 	EventTypeTurnBeginDrawing                        // server-sourced
@@ -39,6 +40,8 @@ func (e GameEventType) String() string {
 		return "StartGameEvent"
 	case EventTypeStartGameIssued:
 		return "StartGameIssuedEvent"
+	case EventTypeTurnDrawingNext:
+		return "TurnDrawingNextEvent"
 	case EventTypeTurnBeginSelection:
 		return "TurnBeginSelectionEvent"
 	case EventTypeTurnWordSelected:

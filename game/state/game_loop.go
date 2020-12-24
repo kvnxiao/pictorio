@@ -40,7 +40,7 @@ func (g *GameStateProcessor) gameLoop() {
 	for g.status.Status() == model.GameStarted {
 		log.Info().Msg("Starting next turn!")
 
-		// 1. Get drawer, skip if disconnected during this check
+		// 1. Send the next drawer, skip if disconnected during this check
 		userModel, isConnected, err := g.getDrawerPlayer()
 		if err != nil {
 			log.Error().Msg("Failed to get current turn's player state")
@@ -54,6 +54,7 @@ func (g *GameStateProcessor) gameLoop() {
 			g.endTurn(userModel)
 			continue
 		}
+		g.sendNextPlayer(userModel)
 		log.Info().Msg(userModel.Name + "'s turn starts.")
 
 		// 2. Begin word selection
@@ -78,12 +79,9 @@ func (g *GameStateProcessor) gameLoop() {
 		log.Info().Msg("Turn ended")
 
 		// 7. Check rounds to end game loop
-		if g.checkRounds() {
-			// game over
-			g.gameOver()
-			break
-		}
+		g.checkRounds()
 	}
+	g.gameOver()
 }
 
 func (g *GameStateProcessor) getDrawerPlayer() (model.User, bool, error) {
@@ -94,6 +92,41 @@ func (g *GameStateProcessor) getDrawerPlayer() (model.User, bool, error) {
 	}
 
 	return player.ToUserModel(), player.IsConnected(), nil
+}
+
+func (g *GameStateProcessor) sendNextPlayer(userModel model.User) {
+	g.status.SetTurnStatus(model.TurnNextPlayer)
+
+	maxTimeSeconds := g.status.MaxNextUpTimeSeconds()
+	g.broadcast(events.TurnDrawingNextEvent{
+		NextTurnUser: &userModel,
+		MaxTime:      maxTimeSeconds,
+		TimeLeft:     maxTimeSeconds,
+	})
+
+	timeLeftSeconds := maxTimeSeconds
+	timeout := time.After(time.Duration(maxTimeSeconds) * time.Second)
+	ticker := time.Tick(1 * time.Second)
+	for {
+		select {
+		case <-ticker:
+			timeLeftSeconds -= 1
+			g.status.SetTimeRemaining(timeLeftSeconds)
+			g.broadcast(events.TurnDrawingNextEvent{
+				NextTurnUser: nil,
+				MaxTime:      maxTimeSeconds,
+				TimeLeft:     timeLeftSeconds,
+			})
+		case <-timeout:
+			g.status.SetTimeRemaining(0)
+			g.broadcast(events.TurnDrawingNextEvent{
+				NextTurnUser: nil,
+				MaxTime:      maxTimeSeconds,
+				TimeLeft:     0,
+			})
+			return
+		}
+	}
 }
 
 func (g *GameStateProcessor) waitForSelectedWord(
@@ -112,6 +145,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 		select {
 		case <-timeout:
 			// Player did not select a word in time, auto select a word for them
+			g.status.SetTimeRemaining(0)
 			log.Debug().Msg("Timeout in selecting a word, randomly choosing word")
 			selectedWord = words[rand.Intn(len(words))]
 			return selectedWord
@@ -184,12 +218,14 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 		case <-timeout:
 			// fail-safe timeout has been reached
 			log.Debug().Msg("Fail-safe timeout in drawing")
+			g.status.SetTimeRemaining(0)
+			g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: 0})
 			return
 		case <-ticker:
 			timeLeftSeconds -= 1
 			g.status.SetTimeRemaining(timeLeftSeconds)
 			if timeLeftSeconds < 0 {
-				// end turn if no more time remaining
+				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: 0})
 				return
 			} else {
 				log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
@@ -250,10 +286,14 @@ func (g *GameStateProcessor) endTurn(userModel model.User) {
 
 // checkRounds returns a boolean of whether the rounds played has exceeded the maximum number of rounds to be played
 func (g *GameStateProcessor) checkRounds() bool {
-	// TODO: check rounds to end the game loop
+	if g.status.CurrentRound() >= g.status.MaxRounds() {
+		g.status.SetStatus(model.GameOver)
+		return true
+	}
 	return false
 }
 
 func (g *GameStateProcessor) gameOver() {
-
+	// TODO: game over
+	log.Info().Msg("Game over!")
 }

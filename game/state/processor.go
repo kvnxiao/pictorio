@@ -63,6 +63,7 @@ func NewGameStateProcessor(maxPlayers int, maxRounds int) GameState {
 	return &GameStateProcessor{
 		status: status.NewGameStatus(
 			maxRounds,
+			settings.MaxTurnNextUpTime,
 			settings.MaxTurnSelectionCountdownSeconds,
 			settings.MaxTurnDrawingCountdownSeconds,
 		),
@@ -214,16 +215,8 @@ func (g *GameStateProcessor) StartGame() bool {
 	// Save turn order
 	g.status.SetPlayerOrderIDs(playerOrderIDs)
 
-	// Get turn order
-	currentPlayerTurn, err := g.getCurrentTurnUser()
-	if err != nil {
-		log.Error().
-			Msg("Player order was computed but the current user turn references an invalid user ID")
-		return false
-	}
-
 	// Notify all users that the game has started
-	g.broadcast(events.StartGameEvent{PlayerOrderIDs: playerOrderIDs, CurrentTurnUser: currentPlayerTurn})
+	g.broadcast(events.StartGameEvent{PlayerOrderIDs: playerOrderIDs})
 
 	// Set status to game started
 	g.status.SetStatus(model.GameStarted)
@@ -250,7 +243,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 	// Get current turn user model as a pointer
 	var currentTurnUserPtr *model.User = nil
 	var selfUserIsCurrentTurn = false
-	currentTurnUser, err := g.getCurrentTurnUser()
+	currentTurnUser, _, err := g.getDrawerPlayer()
 	if err == nil {
 		// A current turn exists, meaning the game has already started (otherwise it would be null)
 		selfUserIsCurrentTurn = currentTurnUser.ID == userModel.ID

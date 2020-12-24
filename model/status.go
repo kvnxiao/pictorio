@@ -11,7 +11,8 @@ const (
 type TurnStatus int
 
 const (
-	TurnSelection TurnStatus = iota
+	TurnNextPlayer TurnStatus = iota
+	TurnSelection
 	TurnDrawing
 	TurnEnded
 )

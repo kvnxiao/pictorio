@@ -19,6 +19,8 @@ const (
 	EventTypeTurnBeginDrawing                        // server-sourced
 	EventTypeTurnCountdown                           // server-sourced
 	EventTypeTurnEnd                                 // server-sourced
+	EventTypeAwardPoints                             // server-sourced
+	EventTypeGameOver                                // server-sourced
 )
 
 func (e GameEventType) String() string {
@@ -47,6 +49,10 @@ func (e GameEventType) String() string {
 		return "TurnCountdownEvent"
 	case EventTypeTurnEnd:
 		return "TurnEndEvent"
+	case EventTypeAwardPoints:
+		return "AwardPointsEvent"
+	case EventTypeGameOver:
+		return "GameOverEvent"
 	default:
 		return "UNKNOWN_Event"
 	}

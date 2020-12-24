@@ -151,13 +151,14 @@ func (g *GameStateProcessor) handleGuess(
 			g.broadcastChat(events.ChatUserEvent(guess.User, word.Censored()))
 		} else {
 			// First time the user is guessing the word correctly
-			player, ok := g.players.GetPlayer(guess.User.ID)
+			guesser, ok := g.players.GetPlayer(guess.User.ID)
 			if !ok {
 				log.Error().Msg("Player guessed the word correctly but does not exist in the players list")
 				return
 			}
+			drawer, _ := g.players.GetPlayer(currentTurnUser.ID)
 			guessedPlayers[guess.User.ID] = true
-			g.awardPoints(player, 100)
+			g.awardPoints(guesser, 100, drawer, 20)
 			g.broadcastChat(events.ChatSystemEvent(guess.User.Name + " has guessed the word."))
 		}
 	} else if strings.Contains(candidate, word.Word()) &&

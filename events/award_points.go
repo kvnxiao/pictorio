@@ -8,8 +8,10 @@ import (
 )
 
 type AwardPointsEvent struct {
-	User   model.User `json:"user"`
-	Points int        `json:"points"`
+	Guesser       model.User `json:"guesser"`
+	GuesserPoints int        `json:"guesserPoints"`
+	Drawer        model.User `json:"drawer"`
+	DrawerPoints  int        `json:"drawerPoints"`
 }
 
 func (e AwardPointsEvent) RawJSON() json.RawMessage {

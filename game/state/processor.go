@@ -284,10 +284,16 @@ func (g *GameStateProcessor) RemoveUserConnection(userID string) {
 	}
 }
 
-func (g *GameStateProcessor) awardPoints(player players.PlayerState, points int) {
-	player.AwardPoints(points)
+func (g *GameStateProcessor) awardPoints(
+	guesser players.PlayerState, guesserPoints int,
+	drawer players.PlayerState, drawerPoints int,
+) {
+	guesser.AwardPoints(guesserPoints)
+	drawer.AwardPoints(drawerPoints)
 	g.broadcast(events.AwardPointsEvent{
-		User:   player.ToUserModel(),
-		Points: points,
+		Guesser:       guesser.ToUserModel(),
+		Drawer:        drawer.ToUserModel(),
+		GuesserPoints: guesserPoints,
+		DrawerPoints:  drawerPoints,
 	})
 }

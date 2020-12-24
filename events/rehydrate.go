@@ -8,19 +8,12 @@ import (
 )
 
 type RehydrateEvent struct {
-	// UserRehydrateEvent
-	SelfUser     model.User          `json:"selfUser"`
-	PlayerStates []model.PlayerState `json:"playerStates"`
-
-	// ChatRehydrateEvent
-	ChatMessages []ChatEvent `json:"chatMessages"`
-
-	// GameRehydrateEvent
-	MaxPlayers      int              `json:"maxPlayers"`
-	GameStatus      model.GameStatus `json:"gameStatus"`
-	PlayerOrderIDs  []string         `json:"playerOrderIds"`
-	CurrentTurnUser *model.User      `json:"currentTurnUser"`
-	Lines           []model.Line     `json:"lines,omitempty"`
+	SelfUser        model.User             `json:"selfUser"`
+	CurrentTurnUser *model.User            `json:"currentTurnUser"`
+	ChatMessages    []ChatEvent            `json:"chatMessages"`
+	Players         model.PlayersSummary   `json:"players"`
+	Game            model.GameStateSummary `json:"game"`
+	Lines           []model.Line           `json:"lines"`
 }
 
 func (e RehydrateEvent) RawJSON() json.RawMessage {
@@ -37,23 +30,19 @@ func (e RehydrateEvent) GameEventType() GameEventType {
 }
 
 func RehydrateForUser(
-	user model.User,
-	playerStates []model.PlayerState,
-	chatHistory []ChatEvent,
-	status model.GameStatus,
-	maxPlayerCount int,
-	playerOrderIDs []string,
+	selfUser model.User,
 	currentTurnUser *model.User,
+	chatHistory []ChatEvent,
+	playersSummary model.PlayersSummary,
+	gameSummary model.GameStateSummary,
 	lines []model.Line,
 ) RehydrateEvent {
 	return RehydrateEvent{
-		SelfUser:        user,
-		PlayerStates:    playerStates,
-		ChatMessages:    chatHistory,
-		GameStatus:      status,
-		MaxPlayers:      maxPlayerCount,
-		PlayerOrderIDs:  playerOrderIDs,
+		SelfUser:        selfUser,
 		CurrentTurnUser: currentTurnUser,
+		ChatMessages:    chatHistory,
+		Players:         playersSummary,
+		Game:            gameSummary,
 		Lines:           lines,
 	}
 }

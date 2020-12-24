@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/kvnxiao/pictorio/events"
+	"github.com/kvnxiao/pictorio/game/settings"
 	"github.com/kvnxiao/pictorio/game/state/chat"
 	"github.com/kvnxiao/pictorio/game/state/drawing"
 	"github.com/kvnxiao/pictorio/game/state/players"
@@ -58,9 +59,13 @@ type GameStateProcessor struct {
 	wordGuess chan Guess
 }
 
-func NewGameStateProcessor(maxPlayers int) GameState {
+func NewGameStateProcessor(maxPlayers int, maxRounds int) GameState {
 	return &GameStateProcessor{
-		status:             status.NewGameStatus(),
+		status: status.NewGameStatus(
+			maxRounds,
+			settings.MaxTurnSelectionCountdownSeconds,
+			settings.MaxTurnDrawingCountdownSeconds,
+		),
 		players:            players.NewPlayerContainer(maxPlayers),
 		drawingHistory:     drawing.NewDrawingHistory(),
 		chatHistory:        chat.NewChatHistory(),
@@ -253,12 +258,10 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 	g.emit(
 		events.RehydrateForUser(
 			userModel,
-			g.players.PlayersAsModelList(),
-			g.chatHistory.GetAll(),
-			g.status.Status(),
-			g.players.MaxPlayers(),
-			g.status.PlayerOrderIDs(),
 			currentTurnUserPtr,
+			g.chatHistory.GetAll(),
+			g.players.Summary(),
+			g.status.Summary(),
 			g.drawingHistory.GetAll(),
 		),
 		userModel.ID,
@@ -279,4 +282,12 @@ func (g *GameStateProcessor) RemoveUserConnection(userID string) {
 		g.broadcast(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
 		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
 	}
+}
+
+func (g *GameStateProcessor) awardPoints(player players.PlayerState, points int) {
+	player.AwardPoints(points)
+	g.broadcast(events.AwardPointsEvent{
+		User:   player.ToUserModel(),
+		Points: points,
+	})
 }

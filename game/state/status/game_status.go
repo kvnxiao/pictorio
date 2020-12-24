@@ -9,47 +9,92 @@ import (
 )
 
 type GameStatus interface {
+	Summary() model.GameStateSummary
+
+	MaxRounds() int
+	MaxSelectionTimeSeconds() int
+	MaxTurnTimeSeconds() int
+	CurrentRound() int
+
 	Status() model.GameStatus
 	SetStatus(status model.GameStatus)
+
 	TurnStatus() model.TurnStatus
 	SetTurnStatus(turnStatus model.TurnStatus)
 
 	CurrentWord() words.GameWord
 	SetCurrentWord(word words.GameWord)
-	CurrentRound() int
 
 	CurrentTurnID() string
-	TurnIndex() int
-	NextTurnIndex() int
+	IncrementNextTurn() int
 
 	PlayerOrderIDs() []string
 	SetPlayerOrderIDs(playerOrderIDs []string)
 
 	GenerateWords() []string
+	WordSelections() []string
+
+	SetTimeRemaining(seconds int)
 
 	Cleanup()
 }
 
 type Status struct {
 	mu             sync.RWMutex
+	maxRounds      int
+	currentRound   int
 	status         model.GameStatus
 	turnStatus     model.TurnStatus
 	currentWord    words.GameWord
-	currentRound   int
 	playerOrderIDs []string
 	turnIndex      int
 	wordHistory    map[string]bool
+
+	// Temporary
+	maxSelectionTime int
+	maxTurnTime      int
+	timeLeftSeconds  int
+	wordSelections   []string
 }
 
-func NewGameStatus() GameStatus {
+func NewGameStatus(maxRounds int, maxSelectionSeconds int, maxTurnSeconds int) GameStatus {
 	return &Status{
-		status:         model.GameWaitingReadyUp,
-		turnStatus:     model.TurnSelection,
-		currentWord:    words.GameWord{},
-		currentRound:   1,
-		playerOrderIDs: nil,
-		turnIndex:      0,
-		wordHistory:    make(map[string]bool),
+		// required fields
+		maxRounds:        maxRounds,
+		maxSelectionTime: maxSelectionSeconds,
+		maxTurnTime:      maxTurnSeconds,
+		currentRound:     1,
+		status:           model.GameWaitingReadyUp,
+		turnStatus:       model.TurnSelection,
+		currentWord:      words.GameWord{},
+		playerOrderIDs:   nil,
+		turnIndex:        0,
+		wordHistory:      make(map[string]bool),
+
+		// initialize temp storage variables
+		timeLeftSeconds: 0,
+		wordSelections:  nil,
+	}
+}
+
+func (s *Status) Summary() model.GameStateSummary {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return model.GameStateSummary{
+		MaxRounds:        s.maxRounds,
+		MaxSelectionTime: s.maxSelectionTime,
+		MaxTurnTime:      s.maxTurnTime,
+		Round:            s.currentRound,
+		TimeLeft:         s.timeLeftSeconds,
+		Status:           s.status,
+		TurnStatus:       s.turnStatus,
+		PlayerOrderIDs:   s.playerOrderIDs,
+		WordSummary: model.WordSummary{
+			Word:           s.currentWord.Word(),
+			WordLength:     s.currentWord.WordLength(),
+			WordSelections: s.wordSelections,
+		},
 	}
 }
 
@@ -96,6 +141,27 @@ func (s *Status) SetCurrentWord(word words.GameWord) {
 	s.wordHistory[word.Word()] = true
 }
 
+func (s *Status) MaxRounds() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.maxRounds
+}
+
+func (s *Status) MaxSelectionTimeSeconds() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.maxSelectionTime
+}
+
+func (s *Status) MaxTurnTimeSeconds() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.maxTurnTime
+}
+
 func (s *Status) CurrentRound() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -113,14 +179,7 @@ func (s *Status) CurrentTurnID() string {
 	return ""
 }
 
-func (s *Status) TurnIndex() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.turnIndex
-}
-
-func (s *Status) NextTurnIndex() int {
+func (s *Status) IncrementNextTurn() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -160,7 +219,23 @@ func (s *Status) GenerateWords() []string {
 		}
 	}
 
+	s.wordSelections = w
+
 	return w
+}
+
+func (s *Status) WordSelections() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.wordSelections
+}
+
+func (s *Status) SetTimeRemaining(seconds int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.timeLeftSeconds = seconds
 }
 
 func (s *Status) Cleanup() {

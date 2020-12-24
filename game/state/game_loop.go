@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kvnxiao/pictorio/events"
-	"github.com/kvnxiao/pictorio/game/settings"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/words"
 	"github.com/rs/zerolog/log"
@@ -118,6 +117,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 		case <-ticker:
 			// Send player a decremented TurnCountdown event
 			timeLeftSeconds -= 1
+			g.status.SetTimeRemaining(timeLeftSeconds)
 			if timeLeftSeconds >= 0 {
 				log.Info().Int("timeLeft", timeLeftSeconds).Msg("Counting down for selection")
 				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: timeLeftSeconds})
@@ -185,6 +185,7 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 			return
 		case <-ticker:
 			timeLeftSeconds -= 1
+			g.status.SetTimeRemaining(timeLeftSeconds)
 			if timeLeftSeconds < 0 {
 				// end turn if no more time remaining
 				return
@@ -207,7 +208,8 @@ func (g *GameStateProcessor) beginWordSelection(userModel model.User) ([]string,
 
 	// Generate random word list (words that have not been recorded yet)
 	generatedWords := g.status.GenerateWords()
-	maxSelectionTimeSeconds := settings.MaxTurnSelectionCountdownSeconds
+	maxSelectionTimeSeconds := g.status.MaxSelectionTimeSeconds()
+	g.status.SetTimeRemaining(maxSelectionTimeSeconds)
 
 	// Send TurnBeginSelection event to current turn player (with the words)
 	// Send TurnBeginSelection event to the other players (without the words)
@@ -221,7 +223,8 @@ func (g *GameStateProcessor) beginWordSelection(userModel model.User) ([]string,
 func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, word words.GameWord) int {
 	g.status.SetTurnStatus(model.TurnDrawing)
 
-	maxDrawingTimeSeconds := settings.MaxTurnDrawingCountdownSeconds
+	maxDrawingTimeSeconds := g.status.MaxTurnTimeSeconds()
+	g.status.SetTimeRemaining(maxDrawingTimeSeconds)
 
 	// Send TurnBeginDrawing event to current turn player (with the selected word)
 	// Send TurnBeginDrawing event to the other players (without the selected word)
@@ -238,8 +241,9 @@ func (g *GameStateProcessor) endTurn(userModel model.User) {
 	g.status.SetTurnStatus(model.TurnEnded)
 	g.broadcast(events.TurnEndEvent{User: userModel})
 
-	// TODO: increment current turn to the next user
-	// TODO: increment round counter if next turn loops back
+	// Increment current turn to the next user,
+	// this will also will increment the round counter if the next turn loops back to first player
+	g.status.IncrementNextTurn()
 }
 
 // checkRounds returns a boolean of whether the rounds played has exceeded the maximum number of rounds to be played

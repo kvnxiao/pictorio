@@ -10,11 +10,12 @@ import (
 )
 
 type Players interface {
+	Summary() model.PlayersSummary
+
 	MaxPlayers() int
 	RoomLeaderID() string
 
 	GetPlayer(userID string) (PlayerState, bool)
-	PlayersAsModelList() []model.PlayerState
 
 	ReadyPlayer(userID string, ready bool) bool
 	AllPlayersReady() ([]string, bool)
@@ -44,6 +45,21 @@ func NewPlayerContainer(maxPlayers int) Players {
 	}
 }
 
+func (s *PlayerStatesMap) Summary() model.PlayersSummary {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var playerStates []model.PlayerState
+	for _, p := range s.players {
+		playerStates = append(playerStates, p.ToModel(s.roomLeaderID))
+	}
+
+	return model.PlayersSummary{
+		PlayerStates: playerStates,
+		MaxPlayers:   s.maxPlayers,
+	}
+}
+
 func (s *PlayerStatesMap) MaxPlayers() int {
 	return s.maxPlayers
 }
@@ -61,18 +77,6 @@ func (s *PlayerStatesMap) GetPlayer(userID string) (PlayerState, bool) {
 
 	player, ok := s.players[userID]
 	return player, ok
-}
-
-func (s *PlayerStatesMap) PlayersAsModelList() []model.PlayerState {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var playerStates []model.PlayerState
-	for _, p := range s.players {
-		playerStates = append(playerStates, p.ToModel(s.roomLeaderID))
-	}
-
-	return playerStates
 }
 
 func (s *PlayerStatesMap) ReadyPlayer(userID string, ready bool) bool {
@@ -108,6 +112,7 @@ func (s *PlayerStatesMap) SaveConnection(u *user.User) PlayerState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Set the first user as the room leader
 	if s.roomLeaderID == "" {
 		s.roomLeaderID = u.ID
 	}

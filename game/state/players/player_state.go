@@ -9,8 +9,12 @@ type PlayerState interface {
 	ID() string
 	Name() string
 
+	AwardPoints(points int)
+	AwardWin()
+
 	Points() int
 	Wins() int
+
 	IsSpectator() bool
 	IsConnected() bool
 	IsReady() bool
@@ -44,6 +48,14 @@ func newPlayer(u *user.User, isSpectator bool) PlayerState {
 		isConnected: false,
 		isReady:     false,
 	}
+}
+
+func (p *Player) AwardPoints(points int) {
+	p.points += points
+}
+
+func (p *Player) AwardWin() {
+	p.wins += 1
 }
 
 func (p *Player) Points() int {

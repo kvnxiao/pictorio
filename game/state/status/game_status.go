@@ -9,7 +9,7 @@ import (
 )
 
 type GameStatus interface {
-	Summary() model.GameStateSummary
+	Summary(selfUserIsCurrentTurn bool) model.GameStateSummary
 
 	MaxRounds() int
 	MaxSelectionTimeSeconds() int
@@ -77,9 +77,19 @@ func NewGameStatus(maxRounds int, maxSelectionSeconds int, maxTurnSeconds int) G
 	}
 }
 
-func (s *Status) Summary() model.GameStateSummary {
+func (s *Status) Summary(selfUserIsCurrentTurn bool) model.GameStateSummary {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	wordSelections := s.wordSelections
+	if s.turnStatus == model.TurnSelection {
+		wordSelections = nil
+	}
+
+	word := s.currentWord.Word()
+	if !selfUserIsCurrentTurn {
+		word = ""
+	}
 
 	return model.GameStateSummary{
 		MaxRounds:        s.maxRounds,
@@ -91,9 +101,9 @@ func (s *Status) Summary() model.GameStateSummary {
 		TurnStatus:       s.turnStatus,
 		PlayerOrderIDs:   s.playerOrderIDs,
 		WordSummary: model.WordSummary{
-			Word:           s.currentWord.Word(),
+			Word:           word,
 			WordLength:     s.currentWord.WordLength(),
-			WordSelections: s.wordSelections,
+			WordSelections: wordSelections,
 		},
 	}
 }

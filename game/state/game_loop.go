@@ -54,6 +54,7 @@ func (g *GameStateProcessor) gameLoop() {
 			g.endTurn(userModel)
 			continue
 		}
+		log.Info().Msg(userModel.Name + "'s turn starts.")
 
 		// 2. Begin word selection
 		generatedWords, maxSelectionTimeSeconds := g.beginWordSelection(userModel)
@@ -111,7 +112,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 		select {
 		case <-timeout:
 			// Player did not select a word in time, auto select a word for them
-			log.Info().Msg("Timeout in selecting a word, randomly choosing word")
+			log.Debug().Msg("Timeout in selecting a word, randomly choosing word")
 			selectedWord = words[rand.Intn(len(words))]
 			return selectedWord
 		case <-ticker:
@@ -119,7 +120,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 			timeLeftSeconds -= 1
 			g.status.SetTimeRemaining(timeLeftSeconds)
 			if timeLeftSeconds >= 0 {
-				log.Info().Int("timeLeft", timeLeftSeconds).Msg("Counting down for selection")
+				log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for selection")
 				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: timeLeftSeconds})
 			}
 		case selectionIndex := <-g.wordSelectionIndex:
@@ -182,7 +183,7 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 		select {
 		case <-timeout:
 			// fail-safe timeout has been reached
-			log.Info().Msg("Fail-safe timeout in drawing")
+			log.Debug().Msg("Fail-safe timeout in drawing")
 			return
 		case <-ticker:
 			timeLeftSeconds -= 1
@@ -191,7 +192,7 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, m
 				// end turn if no more time remaining
 				return
 			} else {
-				log.Info().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
+				log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
 				g.broadcast(events.TurnCountdownEvent{User: currentTurnUser, TimeLeft: timeLeftSeconds})
 			}
 		case guess := <-g.wordGuess:

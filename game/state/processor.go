@@ -249,8 +249,11 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 
 	// Get current turn user model as a pointer
 	var currentTurnUserPtr *model.User = nil
+	var selfUserIsCurrentTurn = false
 	currentTurnUser, err := g.getCurrentTurnUser()
 	if err == nil {
+		// A current turn exists, meaning the game has already started (otherwise it would be null)
+		selfUserIsCurrentTurn = currentTurnUser.ID == userModel.ID
 		currentTurnUserPtr = &currentTurnUser
 	}
 
@@ -261,7 +264,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 			currentTurnUserPtr,
 			g.chatHistory.GetAll(),
 			g.players.Summary(),
-			g.status.Summary(),
+			g.status.Summary(selfUserIsCurrentTurn),
 			g.drawingHistory.GetAll(),
 		),
 		userModel.ID,

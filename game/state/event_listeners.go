@@ -36,7 +36,6 @@ func (g *GameStateProcessor) onChatEvent(event events.ChatEvent) {
 }
 
 func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
-	log.Info().Msg("received draw event!")
 	// Validate drawing is from current turn's user
 	if g.status.CurrentTurnID() != event.User.ID {
 		log.Error().Msg("Received a " + event.GameEventType().String() +

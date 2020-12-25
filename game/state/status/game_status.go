@@ -14,7 +14,8 @@ type GameStatus interface {
 	MaxRounds() int
 	MaxNextUpTimeSeconds() int
 	MaxSelectionTimeSeconds() int
-	MaxTurnTimeSeconds() int
+	MaxTurnDrawingTimeSeconds() int
+	MaxTurnEndTimeSeconds() int
 	CurrentRound() int
 
 	Status() model.GameStatus
@@ -45,7 +46,8 @@ type Status struct {
 	maxRounds        int
 	maxNextUpTime    int
 	maxSelectionTime int
-	maxTurnTime      int
+	maxDrawingTime   int
+	maxTurnEndTime   int
 	currentRound     int
 	status           model.GameStatus
 	turnStatus       model.TurnStatus
@@ -59,13 +61,14 @@ type Status struct {
 	wordSelections  []string
 }
 
-func NewGameStatus(maxRounds int, maxNextUpTime int, maxSelectionSeconds int, maxTurnSeconds int) GameStatus {
+func NewGameStatus(maxRounds int, maxNextUpTime int, maxSelectionSeconds int, maxTurnSeconds int, maxTurnEndTime int) GameStatus {
 	return &Status{
 		// required fields
 		maxRounds:        maxRounds,
 		maxNextUpTime:    maxNextUpTime,
 		maxSelectionTime: maxSelectionSeconds,
-		maxTurnTime:      maxTurnSeconds,
+		maxDrawingTime:   maxTurnSeconds,
+		maxTurnEndTime:   maxTurnEndTime,
 		currentRound:     0,
 		status:           model.GameWaitingReadyUp,
 		turnStatus:       model.TurnSelection,
@@ -98,7 +101,8 @@ func (s *Status) Summary(selfUserIsCurrentTurn bool) model.GameStateSummary {
 		MaxRounds:        s.maxRounds,
 		MaxNextUpTime:    s.maxNextUpTime,
 		MaxSelectionTime: s.maxSelectionTime,
-		MaxTurnTime:      s.maxTurnTime,
+		MaxDrawingTime:   s.maxDrawingTime,
+		MaxEndTime:       s.maxTurnEndTime,
 		Round:            s.currentRound,
 		TimeLeft:         s.timeLeftSeconds,
 		Status:           s.status,
@@ -176,11 +180,18 @@ func (s *Status) MaxSelectionTimeSeconds() int {
 	return s.maxSelectionTime
 }
 
-func (s *Status) MaxTurnTimeSeconds() int {
+func (s *Status) MaxTurnDrawingTimeSeconds() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.maxTurnTime
+	return s.maxDrawingTime
+}
+
+func (s *Status) MaxTurnEndTimeSeconds() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.maxTurnEndTime
 }
 
 func (s *Status) CurrentRound() int {

@@ -64,8 +64,9 @@ func NewGameStateProcessor(maxPlayers int, maxRounds int) GameState {
 		status: status.NewGameStatus(
 			maxRounds,
 			settings.MaxTurnNextUpTime,
-			settings.MaxTurnSelectionCountdownSeconds,
-			settings.MaxTurnDrawingCountdownSeconds,
+			settings.MaxTurnSelectionTimeSeconds,
+			settings.MaxTurnDrawingTimeSeconds,
+			settings.MaxTurnEndTimeSeconds,
 		),
 		players:            players.NewPlayerContainer(maxPlayers),
 		drawingHistory:     drawing.NewDrawingHistory(),
@@ -96,9 +97,8 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 			case events.EventTypeUserJoinLeave:
 			case events.EventTypeRehydrate:
 			case events.EventTypeStartGame:
-			case events.EventTypeTurnBeginSelection:
-			case events.EventTypeTurnBeginDrawing:
-			case events.EventTypeTurnCountdown:
+			case events.EventTypeTurnWordSelection:
+			case events.EventTypeTurnDrawing:
 			case events.EventTypeTurnEnd:
 				g.warnServerSourcedEvent(event.Type)
 

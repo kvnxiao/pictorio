@@ -7,21 +7,20 @@ import (
 type GameEventType int
 
 const (
-	EventTypeUserJoinLeave      GameEventType = iota // server-sourced
-	EventTypeRehydrate                               // server-sourced
-	EventTypeChat                                    // bi-directional
-	EventTypeDraw                                    // bi-directional
-	EventTypeReady                                   // bi-directional
-	EventTypeStartGame                               // server-sourced
-	EventTypeStartGameIssued                         // client-sourced
-	EventTypeTurnDrawingNext                         // server-sourced
-	EventTypeTurnBeginSelection                      // server-sourced
-	EventTypeTurnWordSelected                        // client-sourced
-	EventTypeTurnBeginDrawing                        // server-sourced
-	EventTypeTurnCountdown                           // server-sourced
-	EventTypeTurnEnd                                 // server-sourced
-	EventTypeAwardPoints                             // server-sourced
-	EventTypeGameOver                                // server-sourced
+	EventTypeUserJoinLeave     GameEventType = iota // server-sourced
+	EventTypeRehydrate                              // server-sourced
+	EventTypeChat                                   // bi-directional
+	EventTypeDraw                                   // bi-directional
+	EventTypeReady                                  // bi-directional
+	EventTypeStartGame                              // server-sourced
+	EventTypeStartGameIssued                        // client-sourced
+	EventTypeTurnNextPlayer                         // server-sourced
+	EventTypeTurnWordSelection                      // server-sourced
+	EventTypeTurnWordSelected                       // client-sourced
+	EventTypeTurnDrawing                            // server-sourced
+	EventTypeTurnEnd                                // server-sourced
+	EventTypeAwardPoints                            // server-sourced
+	EventTypeGameOver                               // server-sourced
 )
 
 func (e GameEventType) String() string {
@@ -40,16 +39,14 @@ func (e GameEventType) String() string {
 		return "StartGameEvent"
 	case EventTypeStartGameIssued:
 		return "StartGameIssuedEvent"
-	case EventTypeTurnDrawingNext:
-		return "TurnDrawingNextEvent"
-	case EventTypeTurnBeginSelection:
-		return "TurnBeginSelectionEvent"
+	case EventTypeTurnNextPlayer:
+		return "TurnNextPlayerEvent"
+	case EventTypeTurnWordSelection:
+		return "TurnWordSelectionEvent"
 	case EventTypeTurnWordSelected:
 		return "TurnWordSelectedEvent"
-	case EventTypeTurnBeginDrawing:
-		return "TurnBeginDrawingEvent"
-	case EventTypeTurnCountdown:
-		return "TurnCountdownEvent"
+	case EventTypeTurnDrawing:
+		return "TurnDrawingEvent"
 	case EventTypeTurnEnd:
 		return "TurnEndEvent"
 	case EventTypeAwardPoints:

@@ -8,7 +8,7 @@ import (
 )
 
 type GameOverEvent struct {
-	Winner model.User
+	Winners []model.Winner `json:"winners"`
 }
 
 func (e GameOverEvent) RawJSON() json.RawMessage {

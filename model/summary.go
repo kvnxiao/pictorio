@@ -20,6 +20,7 @@ type GameStateSummary struct {
 
 	PlayerOrderIDs []string    `json:"playerOrderIds"`
 	WordSummary    WordSummary `json:"words"`
+	Winners        []Winner    `json:"winners"`
 }
 
 type PlayersSummary struct {

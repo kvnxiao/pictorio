@@ -38,6 +38,8 @@ type GameStatus interface {
 
 	SetTimeRemaining(seconds int)
 
+	SetWinners(winners []model.Winner)
+
 	Cleanup()
 }
 
@@ -56,9 +58,10 @@ type Status struct {
 	turnIndex        int
 	wordHistory      map[string]bool
 
-	// Temporary
+	// Ephemeral
 	timeLeftSeconds int
 	wordSelections  []string
+	winners         []model.Winner
 }
 
 func NewGameStatus(maxRounds int, maxNextUpTime int, maxSelectionSeconds int, maxTurnSeconds int, maxTurnEndTime int) GameStatus {
@@ -80,6 +83,7 @@ func NewGameStatus(maxRounds int, maxNextUpTime int, maxSelectionSeconds int, ma
 		// initialize temp storage variables
 		timeLeftSeconds: 0,
 		wordSelections:  nil,
+		winners:         nil,
 	}
 }
 
@@ -113,6 +117,7 @@ func (s *Status) Summary(selfUserIsCurrentTurn bool) model.GameStateSummary {
 			WordLength:     s.currentWord.WordLength(),
 			WordSelections: wordSelections,
 		},
+		Winners: s.winners,
 	}
 }
 
@@ -270,15 +275,25 @@ func (s *Status) SetTimeRemaining(seconds int) {
 	s.timeLeftSeconds = seconds
 }
 
+func (s *Status) SetWinners(winners []model.Winner) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.winners = winners
+}
+
 func (s *Status) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.currentRound = 0
 	s.status = model.GameWaitingReadyUp
 	s.turnStatus = model.TurnSelection
 	s.currentWord = words.GameWord{}
-	s.currentRound = 1
-	s.turnIndex = 0
 	s.playerOrderIDs = nil
+	s.turnIndex = 0
 	s.wordHistory = nil
+	s.timeLeftSeconds = 0
+	s.wordSelections = nil
+	s.winners = nil
 }

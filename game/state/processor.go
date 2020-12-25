@@ -59,16 +59,12 @@ type GameStateProcessor struct {
 	wordGuess chan Guess
 }
 
-func NewGameStateProcessor(maxPlayers int, maxRounds int) GameState {
+func NewGameStateProcessor() GameState {
+	s := settings.DefaultSettings()
+
 	return &GameStateProcessor{
-		status: status.NewGameStatus(
-			maxRounds,
-			settings.MaxTurnNextUpTime,
-			settings.MaxTurnSelectionTimeSeconds,
-			settings.MaxTurnDrawingTimeSeconds,
-			settings.MaxTurnEndTimeSeconds,
-		),
-		players:            players.NewPlayerContainer(maxPlayers),
+		status:             status.NewGameStatus(s),
+		players:            players.NewPlayerContainer(s.MaxPlayers),
 		drawingHistory:     drawing.NewDrawingHistory(),
 		chatHistory:        chat.NewChatHistory(),
 		cleanedUpChan:      make(chan bool),

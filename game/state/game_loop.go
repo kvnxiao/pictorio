@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/kvnxiao/pictorio/events"
+	"github.com/kvnxiao/pictorio/game/guess"
+	"github.com/kvnxiao/pictorio/game/hint"
+	"github.com/kvnxiao/pictorio/game/settings"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/words"
 	"github.com/rs/zerolog/log"
@@ -48,6 +51,7 @@ func (g *GameStateProcessor) gameLoop() {
 	// while game is in started state, continue game loop
 	for g.status.Status() == model.GameStarted {
 		log.Info().Msg("Starting next turn!")
+		setting := g.status.Settings()
 
 		// 1. Send the next drawer, skip if disconnected during this check
 		userModel, isConnected, err := g.getDrawerPlayer()
@@ -66,30 +70,28 @@ func (g *GameStateProcessor) gameLoop() {
 		}
 
 		// 2. Begin next player turn notification
-		g.beginTurnNextPlayer(userModel)
+		g.beginTurnNextPlayer(userModel, setting)
 		log.Info().Msg(userModel.Name + "'s turn starts.")
 
 		// 3. Begin word selection
-		generatedWords, maxSelectionTimeSeconds := g.beginWordSelection(userModel)
-
 		// 4. Wait for word selection
+		generatedWords, maxSelectionTimeSeconds := g.beginWordSelection(userModel, setting)
 		selectedWord := g.waitForSelectedWord(generatedWords, maxSelectionTimeSeconds)
 		word := words.NewGameWord(selectedWord)
 		g.status.SetCurrentWord(word)
 
 		// 5. Begin turn drawing
-		maxDrawingTimeSeconds := g.beginTurnDrawing(userModel, word)
-
 		// 6. Wait for player guesses, or timeout from current drawer drawing
-		g.waitForGuessOrTimeout(userModel, maxDrawingTimeSeconds)
+		maxDrawingTimeSeconds := g.beginTurnDrawing(userModel, word, setting)
+		g.waitForGuessOrTimeout(userModel, maxDrawingTimeSeconds, setting)
 
 		// 7. End current turn
-		g.beginTurnEnd(userModel)
+		g.beginTurnEnd(userModel, setting)
 
 		log.Info().Msg("Turn ended")
 
 		// 8. Check rounds to end game loop
-		g.checkRounds()
+		g.checkRounds(setting)
 	}
 	g.gameOver()
 }
@@ -104,10 +106,10 @@ func (g *GameStateProcessor) getDrawerPlayer() (model.User, bool, error) {
 	return player.ToUserModel(), player.IsConnected(), nil
 }
 
-func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User) {
+func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting settings.GameSettings) {
 	g.status.SetTurnStatus(model.TurnNextPlayer)
 
-	maxTimeSeconds := g.status.MaxNextUpTimeSeconds()
+	maxTimeSeconds := setting.MaxTurnNextPlayerTimeSeconds
 	g.broadcast(events.TurnBeginNextPlayer(userModel, maxTimeSeconds))
 
 	timeLeftSeconds := maxTimeSeconds
@@ -115,14 +117,20 @@ func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User) {
 	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
-		case <-ticker:
-			timeLeftSeconds -= 1
-			g.status.SetTimeRemaining(timeLeftSeconds)
-			g.broadcast(events.TurnNextPlayerCountdown(maxTimeSeconds, timeLeftSeconds))
+
 		case <-timeout:
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnNextPlayerCountdown(maxTimeSeconds, 0))
 			return
+
+		case <-ticker:
+			timeLeftSeconds -= 1
+			if timeLeftSeconds < 0 {
+				timeLeftSeconds = 0
+			}
+
+			g.status.SetTimeRemaining(timeLeftSeconds)
+			g.broadcast(events.TurnNextPlayerCountdown(maxTimeSeconds, timeLeftSeconds))
 		}
 	}
 }
@@ -132,7 +140,7 @@ func (g *GameStateProcessor) waitForSelectedWord(
 	maxTimeSeconds int,
 ) string {
 	timeLeftSeconds := maxTimeSeconds
-	timeout := time.After(time.Duration(maxTimeSeconds) * time.Second)
+	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
 
 	var selectedWord string
@@ -140,20 +148,23 @@ func (g *GameStateProcessor) waitForSelectedWord(
 	startTime := time.Now().UnixNano()
 	for {
 		select {
+
+		// Player did not select a word in time, auto select a word for them
 		case <-timeout:
-			// Player did not select a word in time, auto select a word for them
 			g.status.SetTimeRemaining(0)
-			log.Debug().Msg("Timeout in selecting a word, randomly choosing word")
 			selectedWord = words[rand.Intn(len(words))]
 			return selectedWord
+
+		// Send players a decrementing TurnWordSelection event
 		case <-ticker:
-			// Send player a decremented TurnCountdown event
 			timeLeftSeconds -= 1
-			g.status.SetTimeRemaining(timeLeftSeconds)
-			if timeLeftSeconds >= 0 {
-				log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for selection")
-				g.broadcast(events.TurnWordSelectionCountdown(maxTimeSeconds, timeLeftSeconds))
+			if timeLeftSeconds < 0 {
+				timeLeftSeconds = 0
 			}
+
+			g.status.SetTimeRemaining(timeLeftSeconds)
+			g.broadcast(events.TurnWordSelectionCountdown(maxTimeSeconds, timeLeftSeconds))
+
 		case selectionIndex := <-g.wordSelectionIndex:
 			// Ignore elements from selection index channel if the timestamp is before when startTime was calculated
 			if selectionIndex.Timestamp >= startTime {
@@ -172,78 +183,101 @@ func (g *GameStateProcessor) waitForSelectedWord(
 func (g *GameStateProcessor) handleGuess(
 	currentTurnUser model.User,
 	word words.GameWord,
-	guessedPlayers map[string]bool,
-	guess Guess,
-) {
-	candidate := strings.ToLower(strings.TrimSpace(guess.Value))
+	guesses *guess.PlayerGuesses,
+	wordGuess Guess,
+) bool {
+	candidate := strings.ToLower(strings.TrimSpace(wordGuess.Value))
 
+	// Handle word match
 	if word.Word() == candidate {
-		if currentTurnUser.ID == guess.User.ID || guessedPlayers[guess.User.ID] {
+		if currentTurnUser.ID == wordGuess.User.ID || guesses.HasGuessed(wordGuess.User.ID) {
 			// Send censored word if user has already guessed the word, or the drawer is trying to send the word
-			g.broadcastChat(events.ChatUserEvent(guess.User, word.Censored()))
-		} else {
-			// First time the user is guessing the word correctly
-			guesser, ok := g.players.GetPlayer(guess.User.ID)
-			if !ok {
-				log.Error().Msg("Player guessed the word correctly but does not exist in the players list")
-				return
-			}
-			drawer, _ := g.players.GetPlayer(currentTurnUser.ID)
-			guessedPlayers[guess.User.ID] = true
-			g.awardPoints(guesser, 100, drawer, 20)
-			g.broadcastChat(events.ChatSystemEvent(guess.User.Name + " has guessed the word."))
+			g.broadcastChat(events.ChatUserEvent(wordGuess.User, word.Censored()))
+			return false
 		}
-	} else if strings.Contains(candidate, word.Word()) &&
-		(currentTurnUser.ID == guess.User.ID || guessedPlayers[guess.User.ID]) {
-		g.broadcastChat(events.ChatUserEvent(guess.User, words.Censor(len(guess.Value))))
-	} else {
-		g.broadcastChat(events.ChatUserEvent(guess.User, guess.Value))
+
+		// First time the user is guessing the word correctly
+		guesser, ok := g.players.GetPlayer(wordGuess.User.ID)
+		if !ok {
+			log.Error().Msg("Player guessed the word correctly but does not exist in the players list")
+			return false
+		}
+		drawer, _ := g.players.GetPlayer(currentTurnUser.ID)
+		guesserPoints, drawerPoints := guesses.AddGuessed(wordGuess.User.ID)
+		g.awardPoints(guesser, guesserPoints, drawer, drawerPoints)
+		g.broadcastChat(events.ChatSystemEvent(wordGuess.User.Name + " has guessed the word."))
+		return true
 	}
+
+	// Handle non-exact-match messages
+	if strings.Contains(candidate, word.Word()) &&
+		(currentTurnUser.ID == wordGuess.User.ID || guesses.HasGuessed(wordGuess.User.ID)) {
+		// Censor text that contains the word as a substring
+		g.broadcastChat(events.ChatUserEvent(wordGuess.User, words.Censor(len(wordGuess.Value))))
+	} else {
+		// Regular chat messages
+		g.broadcastChat(events.ChatUserEvent(wordGuess.User, wordGuess.Value))
+	}
+	return false
 }
 
-func (g *GameStateProcessor) waitForGuessOrTimeout(currentTurnUser model.User, maxTimeSeconds int) {
-	guessedPlayers := make(map[string]bool)
+func (g *GameStateProcessor) waitForGuessOrTimeout(
+	currentTurnUser model.User,
+	maxTimeSeconds int,
+	setting settings.GameSettings,
+) {
+	guesses := guess.NewPlayerGuesses()
 	currentWord := g.status.CurrentWord()
+	hints := hint.NewHint(currentWord.Hints(), setting.HintSettings)
+	var hintsToSend = make([]model.Hint, 0)
 
 	timeLeftSeconds := maxTimeSeconds
-	timeout := time.After(time.Duration(maxTimeSeconds) * time.Second)
+	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
 
 	startTime := time.Now().UnixNano()
 	for {
 		select {
+
+		// Turn ended
 		case <-timeout:
-			// fail-safe timeout has been reached
-			log.Debug().Msg("Fail-safe timeout in drawing")
 			g.status.SetTimeRemaining(0)
-			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0))
+			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0, hintsToSend))
 			return
+
+		// Send players a decrementing TurnDrawing event
 		case <-ticker:
 			timeLeftSeconds -= 1
-			g.status.SetTimeRemaining(timeLeftSeconds)
-			if timeLeftSeconds <= 0 {
-				g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0))
-				return
-			} else {
-				log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
-				g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds))
+			if timeLeftSeconds < 0 {
+				timeLeftSeconds = 0
 			}
-		case guess := <-g.wordGuess:
+
+			g.status.SetTimeRemaining(timeLeftSeconds)
+
+			nextHint, hasNextHint := hints.NextHint(timeLeftSeconds)
+			if hasNextHint {
+				hintsToSend = append(hintsToSend, nextHint)
+			}
+
+			log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
+			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds, hintsToSend))
+
+		case wordGuess := <-g.wordGuess:
 			// Ignore elements from word guess channel if the timestamp is before when startTime was calculated
-			if guess.Timestamp >= startTime {
-				g.handleGuess(currentTurnUser, currentWord, guessedPlayers, guess)
+			if wordGuess.Timestamp >= startTime {
+				g.handleGuess(currentTurnUser, currentWord, guesses, wordGuess)
 			}
 		}
 	}
 }
 
 // beginWordSelection starts the word selection process for the current turn
-func (g *GameStateProcessor) beginWordSelection(userModel model.User) ([]string, int) {
+func (g *GameStateProcessor) beginWordSelection(userModel model.User, setting settings.GameSettings) ([]string, int) {
 	g.status.SetTurnStatus(model.TurnSelection)
 
 	// Generate random word list (words that have not been recorded yet)
 	generatedWords := g.status.GenerateWords()
-	maxSelectionTimeSeconds := g.status.MaxSelectionTimeSeconds()
+	maxSelectionTimeSeconds := setting.MaxTurnSelectionTimeSeconds
 	g.status.SetTimeRemaining(maxSelectionTimeSeconds)
 
 	// Send TurnBeginSelection event to current drawer (with the words)
@@ -255,10 +289,10 @@ func (g *GameStateProcessor) beginWordSelection(userModel model.User) ([]string,
 }
 
 // beginTurnDrawing starts the turn drawing
-func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, word words.GameWord) int {
+func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, word words.GameWord, setting settings.GameSettings) int {
 	g.status.SetTurnStatus(model.TurnDrawing)
 
-	maxDrawingTimeSeconds := g.status.MaxTurnDrawingTimeSeconds()
+	maxDrawingTimeSeconds := setting.MaxTurnDrawingTimeSeconds
 	g.status.SetTimeRemaining(maxDrawingTimeSeconds)
 
 	// Send TurnBeginDrawing event to current drawer (with the selected word)
@@ -276,12 +310,12 @@ func (g *GameStateProcessor) skipTurn() {
 	g.status.IncrementNextTurn()
 }
 
-func (g *GameStateProcessor) beginTurnEnd(userModel model.User) {
+func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings.GameSettings) {
 	g.status.SetTurnStatus(model.TurnEnded)
 	word := g.status.CurrentWord().Word()
 
 	// Notify that the current drawer's turn is ending, and broadcast what the word was
-	maxTurnEndTimeSeconds := g.status.MaxTurnEndTimeSeconds()
+	maxTurnEndTimeSeconds := setting.MaxTurnEndTimeSeconds
 	g.broadcast(events.TurnBeginEnd(userModel, word, maxTurnEndTimeSeconds))
 
 	// Clear drawing state
@@ -296,22 +330,28 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User) {
 	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
-		case <-ticker:
-			timeLeftSeconds -= 1
-			g.status.SetTimeRemaining(timeLeftSeconds)
-			g.broadcast(events.TurnEndCountdown(maxTurnEndTimeSeconds, timeLeftSeconds))
+
 		case <-timeout:
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnEndCountdown(maxTurnEndTimeSeconds, 0))
 			return
+
+		case <-ticker:
+			timeLeftSeconds -= 1
+			if timeLeftSeconds <= 0 {
+				timeLeftSeconds = 0
+			}
+
+			g.status.SetTimeRemaining(timeLeftSeconds)
+			g.broadcast(events.TurnEndCountdown(maxTurnEndTimeSeconds, timeLeftSeconds))
 		}
 	}
 }
 
 // checkRounds returns a boolean of whether the rounds played has exceeded the maximum number of rounds to be played
-func (g *GameStateProcessor) checkRounds() bool {
+func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
 	log.Info().Int("round", g.status.CurrentRound()).Msg("Current round is.")
-	if g.status.CurrentRound() >= g.status.MaxRounds() {
+	if g.status.CurrentRound() >= setting.MaxRounds {
 		g.status.SetStatus(model.GameOver)
 		return true
 	}

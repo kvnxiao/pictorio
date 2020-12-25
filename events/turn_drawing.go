@@ -23,6 +23,7 @@ type TurnDrawingNonce struct {
 // - Word is nil
 type TurnDrawingEvent struct {
 	Nonce    *TurnDrawingNonce `json:"nonce,omitempty"`
+	Hints    []model.Hint      `json:"hints,omitempty"`
 	MaxTime  int               `json:"maxTime"`
 	TimeLeft int               `json:"timeLeft"`
 	Status   model.TurnStatus  `json:"status"`
@@ -58,6 +59,7 @@ func turnBeginDrawing(
 			WordLength: wordLengths,
 			Word:       wordPtr,
 		},
+		Hints:    nil,
 		MaxTime:  maxTimeSeconds,
 		TimeLeft: maxTimeSeconds,
 		Status:   model.TurnDrawing,
@@ -77,9 +79,10 @@ func TurnBeginDrawingCurrentPlayer(
 	return turnBeginDrawing(currentTurnUser, maxTimeSeconds, wordLengths, word)
 }
 
-func TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds int) TurnDrawingEvent {
+func TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds int, hints []model.Hint) TurnDrawingEvent {
 	return TurnDrawingEvent{
 		Nonce:    nil,
+		Hints:    hints,
 		MaxTime:  maxTimeSeconds,
 		TimeLeft: timeLeftSeconds,
 		Status:   model.TurnDrawing,

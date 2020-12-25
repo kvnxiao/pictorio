@@ -20,9 +20,6 @@ import (
 
 const (
 	roomIDLength = 9
-
-	maxPlayerNum = 8
-	maxRounds    = 2
 )
 
 type Room struct {
@@ -52,7 +49,7 @@ func NewRoom(roomID string) *Room {
 		roomID:           roomID,
 		closed:           false,
 		usersMap:         make(map[string]*user.User),
-		gameProcessor:    state.NewGameStateProcessor(maxPlayerNum, maxRounds),
+		gameProcessor:    state.NewGameStateProcessor(),
 		startCleanupChan: make(chan bool),
 	}
 	go room.gameProcessor.EventProcessor(room.startCleanupChan)

@@ -443,7 +443,7 @@ grid
 grin
 grizzly bear
 groom
-grown-up
+grown up
 guitar
 gum
 hail
@@ -509,7 +509,7 @@ idea
 igloo
 iron
 island
-jack-in-the-box
+jack in the box
 jacket
 jail
 jar
@@ -1105,14 +1105,13 @@ worm
 wreath
 wrist
 wrist watch
-x-ray
+x ray
 yacht
 yardstick
 yarn
 yawn
 yellow
 yeti
-yo-yo
 yoda
 yoga
 yoyo

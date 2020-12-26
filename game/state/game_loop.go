@@ -91,7 +91,9 @@ func (g *GameStateProcessor) gameLoop() {
 		log.Info().Msg("Turn ended")
 
 		// 8. Check rounds to end game loop
-		g.checkRounds(setting)
+		if g.checkRounds(setting) {
+			g.status.SetStatus(model.GameOver)
+		}
 	}
 	g.gameOver()
 }
@@ -318,13 +320,6 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 	maxTimeSeconds := setting.MaxTurnEndTimeSeconds
 	g.broadcast(events.TurnBeginEnd(userModel, word, maxTimeSeconds))
 
-	// Clear drawing state
-	g.drawingHistory.Clear()
-
-	// Increment current turn to the next user,
-	// this will also will increment the round counter if the next turn loops back to first player
-	g.status.IncrementNextTurn()
-
 	timeLeftSeconds := maxTimeSeconds
 	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
@@ -334,6 +329,14 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 		case <-timeout:
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnEndCountdown(maxTimeSeconds, 0))
+
+			// Clear drawing state
+			g.drawingHistory.Clear()
+
+			// Increment current turn to the next user,
+			// this will also will increment the round counter if the next turn loops back to first player
+			g.status.IncrementNextTurn()
+
 			return
 
 		case <-ticker:
@@ -352,7 +355,6 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
 	log.Info().Int("round", g.status.CurrentRound()).Msg("Current round is.")
 	if g.status.CurrentRound() >= setting.MaxRounds {
-		g.status.SetStatus(model.GameOver)
 		return true
 	}
 	return false

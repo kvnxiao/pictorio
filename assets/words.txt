@@ -14,7 +14,7 @@ Eiffel Tower
 Elmo
 Europe
 France
-Frankenstein's monster
+Frankenstein
 India
 Japan
 Las Vegas
@@ -37,7 +37,7 @@ TV
 Texas
 UFO
 acorn
-adam's apple
+adams apple
 airport
 alarm
 alarm clock

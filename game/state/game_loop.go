@@ -113,7 +113,7 @@ func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting s
 	g.broadcast(events.TurnBeginNextPlayer(userModel, maxTimeSeconds))
 
 	timeLeftSeconds := maxTimeSeconds
-	timeout := time.After(time.Duration(maxTimeSeconds) * time.Second)
+	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
@@ -315,8 +315,8 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 	word := g.status.CurrentWord().Word()
 
 	// Notify that the current drawer's turn is ending, and broadcast what the word was
-	maxTurnEndTimeSeconds := setting.MaxTurnEndTimeSeconds
-	g.broadcast(events.TurnBeginEnd(userModel, word, maxTurnEndTimeSeconds))
+	maxTimeSeconds := setting.MaxTurnEndTimeSeconds
+	g.broadcast(events.TurnBeginEnd(userModel, word, maxTimeSeconds))
 
 	// Clear drawing state
 	g.drawingHistory.Clear()
@@ -325,15 +325,15 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 	// this will also will increment the round counter if the next turn loops back to first player
 	g.status.IncrementNextTurn()
 
-	timeLeftSeconds := maxTurnEndTimeSeconds
-	timeout := time.After(time.Duration(maxTurnEndTimeSeconds) * time.Second)
+	timeLeftSeconds := maxTimeSeconds
+	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
 	for {
 		select {
 
 		case <-timeout:
 			g.status.SetTimeRemaining(0)
-			g.broadcast(events.TurnEndCountdown(maxTurnEndTimeSeconds, 0))
+			g.broadcast(events.TurnEndCountdown(maxTimeSeconds, 0))
 			return
 
 		case <-ticker:
@@ -343,7 +343,7 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 			}
 
 			g.status.SetTimeRemaining(timeLeftSeconds)
-			g.broadcast(events.TurnEndCountdown(maxTurnEndTimeSeconds, timeLeftSeconds))
+			g.broadcast(events.TurnEndCountdown(maxTimeSeconds, timeLeftSeconds))
 		}
 	}
 }

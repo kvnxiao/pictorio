@@ -17,6 +17,7 @@ type Players interface {
 	RoomLeaderID() string
 
 	GetPlayer(userID string) (PlayerState, bool)
+	GetConnectedPlayers(includeSpectator bool) []model.User
 
 	ReadyPlayer(userID string, ready bool) bool
 	AllPlayersReady() ([]string, bool)
@@ -81,6 +82,22 @@ func (s *PlayerStatesMap) GetPlayer(userID string) (PlayerState, bool) {
 
 	player, ok := s.players[userID]
 	return player, ok
+}
+
+func (s *PlayerStatesMap) GetConnectedPlayers(includeSpectator bool) []model.User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var connectedUsers []model.User
+
+	for _, player := range s.players {
+		if player.IsConnected() &&
+			(player.IsSpectator() && includeSpectator || !player.IsSpectator()) {
+			connectedUsers = append(connectedUsers, player.ToUserModel())
+		}
+	}
+
+	return connectedUsers
 }
 
 func (s *PlayerStatesMap) ReadyPlayer(userID string, ready bool) bool {

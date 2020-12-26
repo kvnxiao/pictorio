@@ -228,11 +228,17 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 	maxTimeSeconds int,
 	setting settings.GameSettings,
 ) {
-	guesses := guess.NewPlayerGuesses()
 	currentWord := g.status.CurrentWord()
+
+	// Guess
+	guesses := guess.NewPlayerGuesses(currentTurnUser, g.players.GetConnectedPlayers(false))
+	firstGuess := false
+
+	// Hints
 	hints := hint.NewHint(currentWord.Hints(), setting.HintSettings)
 	var hintsToSend = make([]model.Hint, 0)
 
+	// Timer
 	timeLeftSeconds := maxTimeSeconds
 	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
@@ -256,18 +262,30 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 
 			g.status.SetTimeRemaining(timeLeftSeconds)
 
-			nextHint, hasNextHint := hints.NextHint(timeLeftSeconds)
-			if hasNextHint {
-				hintsToSend = append(hintsToSend, nextHint)
+			if !firstGuess {
+				nextHint, hasNextHint := hints.NextHint(timeLeftSeconds)
+				if hasNextHint {
+					hintsToSend = append(hintsToSend, nextHint)
+				}
 			}
-
-			log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Counting down for drawing")
 			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds, hintsToSend))
 
 		case wordGuess := <-g.wordGuess:
 			// Ignore elements from word guess channel if the timestamp is before when startTime was calculated
 			if wordGuess.Timestamp >= startTime {
-				g.handleGuess(currentTurnUser, currentWord, guesses, wordGuess)
+				if g.handleGuess(currentTurnUser, currentWord, guesses, wordGuess) {
+					if guesses.FinishedGuessing() {
+						timeLeftSeconds = 0
+						g.status.SetTimeRemaining(0)
+						g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0, hintsToSend))
+						return
+					} else if timeLeftSeconds > setting.MaxTurnDrawingTimeCutSeconds {
+						firstGuess = true
+						timeLeftSeconds = setting.MaxTurnDrawingTimeCutSeconds
+						g.status.SetTimeRemaining(timeLeftSeconds)
+						g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds, hintsToSend))
+					}
+				}
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package players
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/kvnxiao/pictorio/events"
@@ -27,6 +28,9 @@ type Players interface {
 	SendEventToAllExcept(event events.SerializableEvent, userID string)
 	SendEventToUser(event events.SerializableEvent, userID string)
 
+	Winners() []model.Winner
+
+	Reset()
 	Cleanup()
 }
 
@@ -183,6 +187,37 @@ func (s *PlayerStatesMap) SendEventToUser(event events.SerializableEvent, userID
 		log.Error().Msg("Attempted to send an event to an invalid player ID")
 	}
 	player.SendMessage(eventBytes)
+}
+
+func (s *PlayerStatesMap) Winners() []model.Winner {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var winners []model.Winner
+
+	for _, player := range s.players {
+		if !player.IsSpectator() {
+			winners = append(winners, model.Winner{
+				User:   player.ToUserModel(),
+				Points: player.Points(),
+			})
+		}
+	}
+
+	sort.Slice(winners, func(i, j int) bool {
+		return winners[i].Points > winners[j].Points
+	})
+
+	return winners
+}
+
+func (s *PlayerStatesMap) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, player := range s.players {
+		player.SetReady(false)
+	}
 }
 
 func (s *PlayerStatesMap) Cleanup() {

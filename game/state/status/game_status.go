@@ -36,7 +36,7 @@ type GameStatus interface {
 
 	SetWinners(winners []model.Winner)
 
-	Cleanup()
+	Reset()
 }
 
 type Status struct {
@@ -238,17 +238,20 @@ func (s *Status) SetWinners(winners []model.Winner) {
 	s.winners = winners
 }
 
-func (s *Status) Cleanup() {
+func (s *Status) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// required fields
 	s.currentRound = 0
 	s.status = model.GameWaitingReadyUp
 	s.turnStatus = model.TurnSelection
 	s.currentWord = words.GameWord{}
 	s.playerOrderIDs = nil
 	s.turnIndex = 0
-	s.wordHistory = nil
+	s.wordHistory = make(map[string]bool)
+
+	// initialize temp storage variables
 	s.timeLeftSeconds = 0
 	s.wordSelections = nil
 	s.winners = nil

@@ -361,6 +361,7 @@ func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
 }
 
 func (g *GameStateProcessor) gameOver() {
-	// TODO: game over
-	log.Info().Msg("Game over!")
+	g.broadcast(events.GameOverEvent{
+		Winners: g.players.Winners(),
+	})
 }

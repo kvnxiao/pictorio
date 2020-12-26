@@ -2,15 +2,15 @@ package settings
 
 const (
 	MaxPlayers                   int = 8
-	MaxRounds                    int = 2
+	MaxRounds                    int = 1
 	MaxSelectableWords           int = 3
-	MaxTurnNextPlayerTimeSeconds int = 5
+	MaxTurnNextPlayerTimeSeconds int = 3
 	MaxTurnSelectionTimeSeconds  int = 5
-	MaxTurnDrawingTimeSeconds    int = 60
+	MaxTurnDrawingTimeSeconds    int = 6
 	MaxTurnEndTimeSeconds        int = 5
-	FirstHintTimeLeftSeconds     int = 20
-	SecondHintTimeLeftSeconds    int = 15
-	ThirdHintTimeLeftSeconds     int = 10
+	FirstHintTimeLeftSeconds     int = 3
+	SecondHintTimeLeftSeconds    int = 2
+	ThirdHintTimeLeftSeconds     int = 1
 )
 
 type GameSettings struct {

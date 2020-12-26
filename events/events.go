@@ -21,6 +21,11 @@ const (
 	EventTypeTurnEnd                                // server-sourced
 	EventTypeAwardPoints                            // server-sourced
 	EventTypeGameOver                               // server-sourced
+	EventTypeNewGameIssued                          // client-sourced
+	EventTypeNewGameReset                           // server-sourced
+
+	// For receiving chunked data over WebSockets
+	MultiPartPayload GameEventType = 99
 )
 
 func (e GameEventType) String() string {
@@ -53,6 +58,12 @@ func (e GameEventType) String() string {
 		return "AwardPointsEvent"
 	case EventTypeGameOver:
 		return "GameOverEvent"
+	case EventTypeNewGameIssued:
+		return "NewGameIssuedEvent"
+	case EventTypeNewGameReset:
+		return "NewGameResetEvent"
+	case MultiPartPayload:
+		return "MULTI_PART_PAYLOAD"
 	default:
 		return "UNKNOWN_Event"
 	}

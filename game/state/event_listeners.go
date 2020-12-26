@@ -108,3 +108,20 @@ func (g *GameStateProcessor) onTurnWordSelectedEvent(event events.TurnWordSelect
 		Value:     event.Index,
 	}
 }
+
+func (g *GameStateProcessor) onNewGameIssued(event events.NewGameIssuedEvent) {
+	// Validate the issuer is the room leader
+	if event.Issuer.ID != g.players.RoomLeaderID() {
+		log.Error().
+			Msg("Received a " + events.EventTypeNewGameIssued.String() +
+				" from client who was not the room leader!")
+		return
+	}
+
+	g.status.Reset()
+	g.players.Reset()
+	g.status.SetStatus(model.GameWaitingReadyUp)
+	g.broadcast(events.NewGameResetEvent{
+		PlayerStates: g.players.Summary().PlayerStates,
+	})
+}

@@ -143,6 +143,15 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				}
 				g.onTurnWordSelectedEvent(turnWordSelectedEvent)
 
+			case events.EventTypeNewGameIssued:
+				var newGameIssuedEvent events.NewGameIssuedEvent
+				err := json.Unmarshal(event.Data, &newGameIssuedEvent)
+				if err != nil {
+					log.Error().Err(err).
+						Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onNewGameIssued(newGameIssuedEvent)
+
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")
 			}
@@ -159,7 +168,7 @@ func (g *GameStateProcessor) cleanup() {
 	// Cleanup game state processor
 	g.chatHistory.Clear()
 	g.drawingHistory.Clear()
-	g.status.Cleanup()
+	g.status.Reset()
 	g.players.Cleanup()
 	g.chatHistory = nil
 	g.drawingHistory = nil

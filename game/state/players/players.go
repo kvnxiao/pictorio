@@ -249,6 +249,7 @@ func (s *PlayerStatesMap) Reset() {
 
 	for _, player := range s.players {
 		player.SetReady(false)
+		player.ResetPoints()
 	}
 }
 

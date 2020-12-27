@@ -10,6 +10,7 @@ type PlayerState interface {
 	Name() string
 
 	AwardPoints(points int)
+	ResetPoints()
 	AwardWin()
 
 	Points() int
@@ -52,6 +53,10 @@ func newPlayer(u *user.User, isSpectator bool) PlayerState {
 
 func (p *Player) AwardPoints(points int) {
 	p.points += points
+}
+
+func (p *Player) ResetPoints() {
+	p.points = 0
 }
 
 func (p *Player) AwardWin() {

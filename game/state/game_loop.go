@@ -432,8 +432,11 @@ func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
 func (g *GameStateProcessor) gameOver() {
 	log.Debug().Msg("Game over!")
 
+	winners := g.players.Winners()
+	g.status.SetWinners(winners)
+
 	g.status.SetStatus(model.GameOver)
 	g.broadcast(events.GameOverEvent{
-		Winners: g.players.Winners(),
+		Winners: winners,
 	})
 }

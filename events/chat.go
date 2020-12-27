@@ -18,9 +18,10 @@ const (
 )
 
 const (
-	userJoinedMsg = "has joined the room."
-	userLeftMsg   = "has left the room."
-	userGuessed   = "has guessed the word."
+	userJoinedMsg      = "has joined the room."
+	userLeftMsg        = "has left the room."
+	userGuessedMsg     = "has guessed the word."
+	spectatorJoinedMsg = "has joined the room as a spectator."
 
 	formatSystem     = "%m"
 	formatUser       = "%u: %m"
@@ -47,10 +48,14 @@ func (e ChatEvent) GameEventType() GameEventType {
 	return EventTypeChat
 }
 
-func ChatUserJoined(user model.User) ChatEvent {
+func ChatUserJoined(user model.User, isSpectator bool) ChatEvent {
+	msg := userJoinedMsg
+	if isSpectator {
+		msg = spectatorJoinedMsg
+	}
 	return ChatEvent{
 		User:    user,
-		Message: userJoinedMsg,
+		Message: msg,
 		Format:  formatUserAction,
 		Type:    ChatEventJoin,
 	}
@@ -68,7 +73,7 @@ func ChatUserLeft(user model.User) ChatEvent {
 func ChatUserGuessed(user model.User) ChatEvent {
 	return ChatEvent{
 		User:    user,
-		Message: userGuessed,
+		Message: userGuessedMsg,
 		Format:  formatUserAction,
 		Type:    ChatEventGuessed,
 	}

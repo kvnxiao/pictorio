@@ -303,6 +303,9 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 				}
 			}
 			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds, hintsToSend))
+			if timeLeftSeconds == 0 {
+				return
+			}
 
 		case wordGuess := <-g.wordGuess:
 			// Ignore elements from word guess channel if the timestamp is before when startTime was calculated

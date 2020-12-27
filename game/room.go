@@ -49,7 +49,7 @@ func NewRoom(roomID string) *Room {
 		roomID:           roomID,
 		closed:           false,
 		usersMap:         make(map[string]*user.User),
-		gameProcessor:    state.NewGameStateProcessor(),
+		gameProcessor:    state.NewGameStateProcessor(roomID),
 		startCleanupChan: make(chan bool),
 	}
 	go room.gameProcessor.EventProcessor(room.startCleanupChan)
@@ -131,7 +131,7 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil || userID == "" {
 		randomID, err := ksuid.NewRandom()
 		if err != nil {
-			log.Err(err).Msg("Could not generate a unique ID for new user")
+			log.Error().Err(err).Msg("Could not generate a unique ID for new user")
 			return
 		}
 		userID = randomID.String()
@@ -141,13 +141,13 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 	// Ensure user ID parsed from cookies is of expected type
 	userKSUID, err := ksuid.Parse(userID)
 	if err != nil {
-		log.Err(err).Msg("Could not parse user ID")
+		log.Error().Err(err).Msg("Could not parse user ID")
 	}
 
 	// Read user name
 	userName, err := cookies.GetUserName(req)
 	if err != nil || userName == "" {
-		log.Info().Msg("Generating random name for new user")
+		log.Debug().Msg("Generating random name for new user")
 		userName = random.GenerateName()
 		cookies.SetUserName(w, userName)
 	}
@@ -158,18 +158,18 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 
 	conn, err := ws.Accept(w, req)
 	if err != nil {
-		log.Err(err).Msg("Could not upgrade connection from user to a WebSocket connection.")
+		log.Error().Err(err).Msg("Could not upgrade connection from user to a WebSocket connection.")
 		return
 	}
 
 	err = r.newUserConnection(ctx, conn)
 	if errors.Is(err, context.Canceled) {
-		log.Err(err).Str("type", "cancelled").Msg("User connection closed.")
+		log.Debug().Err(err).Str("type", "cancelled").Msg("User connection closed.")
 		return
 	}
 	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
 		websocket.CloseStatus(err) == websocket.StatusGoingAway {
-		log.Info().Err(err).Str("type", "closed").Msg("User connection closed.")
+		log.Debug().Err(err).Str("type", "closed").Msg("User connection closed.")
 		return
 	}
 }
@@ -199,7 +199,7 @@ func (r *Room) newUserConnection(ctx context.Context, conn *websocket.Conn) erro
 	r.addUser(u)
 	defer r.removeUser(u)
 
-	log.Info().
+	log.Debug().
 		Str("roomID", r.roomID).
 		Str("uid", u.ID).
 		Str("uname", u.Name).

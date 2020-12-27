@@ -21,6 +21,7 @@ type Players interface {
 
 	ReadyPlayer(userID string, ready bool) bool
 	AllPlayersReady() ([]string, bool)
+	AllPlayersDisconnected() bool
 
 	SaveConnection(u *user.User) PlayerState
 	RemoveConnection(userID string) PlayerState
@@ -129,6 +130,18 @@ func (s *PlayerStatesMap) AllPlayersReady() ([]string, bool) {
 	return playerOrderIDs, true
 }
 
+func (s *PlayerStatesMap) AllPlayersDisconnected() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, player := range s.players {
+		if !player.IsSpectator() && player.IsConnected() {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *PlayerStatesMap) SaveConnection(u *user.User) PlayerState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -203,7 +216,9 @@ func (s *PlayerStatesMap) SendEventToUser(event events.SerializableEvent, userID
 	if !ok {
 		log.Error().Msg("Attempted to send an event to an invalid player ID")
 	}
-	player.SendMessage(eventBytes)
+	if player.IsConnected() {
+		player.SendMessage(eventBytes)
+	}
 }
 
 func (s *PlayerStatesMap) Winners() []model.Winner {

@@ -91,7 +91,7 @@ func (g *GameStateProcessor) onStartGameIssuedEvent(event events.StartGameIssued
 	if !started {
 		log.Warn().Msg("Failed to start game!")
 	}
-	log.Info().Msg("Game started!")
+	log.Debug().Msg("Game started!")
 }
 
 func (g *GameStateProcessor) onTurnWordSelectedEvent(event events.TurnWordSelectedEvent) {

@@ -50,7 +50,14 @@ import (
 func (g *GameStateProcessor) gameLoop() {
 	// while game is in started state, continue game loop
 	for g.status.Status() == model.GameStarted {
-		log.Info().Msg("Starting next turn!")
+		// Ensure that everyone currently playing is still connected before continuing
+		if g.players.AllPlayersDisconnected() {
+			log.Info().Msg("Seems like no one is left in the room for a game still in progress. Cleaning up.")
+			g.status.SetStatus(model.GameOver)
+			return
+		}
+
+		log.Debug().Msg("Starting next turn!")
 		setting := g.status.Settings()
 
 		// 1. Send the next drawer, skip if disconnected during this check
@@ -64,14 +71,13 @@ func (g *GameStateProcessor) gameLoop() {
 				log.Error().Msg("Current drawer is not connected, but user ID was invalid")
 				return
 			}
-			log.Info().Msg("Current drawer not connected! Skipping turn.")
+			log.Debug().Msg("Current drawer not connected! Skipping turn.")
 			g.skipTurn()
 			continue
 		}
 
 		// 2. Begin next player turn notification
 		g.beginTurnNextPlayer(userModel, setting)
-		log.Info().Msg(userModel.Name + "'s turn starts.")
 
 		// 3. Begin word selection
 		// 4. Wait for word selection
@@ -88,11 +94,9 @@ func (g *GameStateProcessor) gameLoop() {
 		// 7. End current turn
 		g.beginTurnEnd(userModel, setting)
 
-		log.Info().Msg("Turn ended")
-
 		// 8. Check rounds to end game loop
 		if g.checkRounds(setting) {
-			g.status.SetStatus(model.GameOver)
+			break
 		}
 	}
 	g.gameOver()
@@ -109,6 +113,7 @@ func (g *GameStateProcessor) getDrawerPlayer() (model.User, bool, error) {
 }
 
 func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting settings.GameSettings) {
+	log.Debug().Str("uid", userModel.ID).Msg("Beginning next turn phase for next player")
 	g.status.SetTurnStatus(model.TurnNextPlayer)
 
 	maxTimeSeconds := setting.MaxTurnNextPlayerTimeSeconds
@@ -121,6 +126,7 @@ func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting s
 		select {
 
 		case <-timeout:
+			log.Debug().Str("uid", userModel.ID).Msg("Next turn is starting")
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnNextPlayerCountdown(maxTimeSeconds, 0))
 			return
@@ -130,7 +136,10 @@ func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting s
 			if timeLeftSeconds < 0 {
 				timeLeftSeconds = 0
 			}
-
+			log.Debug().
+				Str("uid", userModel.ID).
+				Int("timeLeft", timeLeftSeconds).
+				Msg("Next turn timer countdown")
 			g.status.SetTimeRemaining(timeLeftSeconds)
 			g.broadcast(events.TurnNextPlayerCountdown(maxTimeSeconds, timeLeftSeconds))
 		}
@@ -141,6 +150,8 @@ func (g *GameStateProcessor) waitForSelectedWord(
 	words []string,
 	maxTimeSeconds int,
 ) string {
+	log.Debug().Msg("Waiting for word selection from drawer")
+
 	timeLeftSeconds := maxTimeSeconds
 	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)
 	ticker := time.Tick(1 * time.Second)
@@ -153,6 +164,9 @@ func (g *GameStateProcessor) waitForSelectedWord(
 
 		// Player did not select a word in time, auto select a word for them
 		case <-timeout:
+			log.Debug().
+				Msg("Word selection timeout")
+
 			g.status.SetTimeRemaining(0)
 			selectedWord = words[rand.Intn(len(words))]
 			return selectedWord
@@ -163,6 +177,10 @@ func (g *GameStateProcessor) waitForSelectedWord(
 			if timeLeftSeconds < 0 {
 				timeLeftSeconds = 0
 			}
+
+			log.Debug().
+				Int("timeLeft", timeLeftSeconds).
+				Msg("Word selection timer countdown")
 
 			g.status.SetTimeRemaining(timeLeftSeconds)
 			g.broadcast(events.TurnWordSelectionCountdown(maxTimeSeconds, timeLeftSeconds))
@@ -175,6 +193,9 @@ func (g *GameStateProcessor) waitForSelectedWord(
 						Msg("Word selection index out of bounds, exceeds the number of generated random words")
 				} else {
 					selectedWord = words[selectionIndex.Value]
+					log.Debug().
+						Str("selectedWord", selectedWord).
+						Msg("A word has been selected by the drawer")
 					return selectedWord
 				}
 			}
@@ -228,6 +249,8 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 	maxTimeSeconds int,
 	setting settings.GameSettings,
 ) {
+	log.Debug().Msg("Waiting for guess or timeout for the drawing phase")
+
 	currentWord := g.status.CurrentWord()
 
 	// Guess
@@ -249,6 +272,8 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 
 		// Turn ended
 		case <-timeout:
+			log.Debug().Msg("Drawing phase timeout")
+
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0, hintsToSend))
 			return
@@ -260,11 +285,20 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 				timeLeftSeconds = 0
 			}
 
+			log.Debug().
+				Int("timeLeft", timeLeftSeconds).
+				Msg("Drawing phase timer countdown")
+
 			g.status.SetTimeRemaining(timeLeftSeconds)
 
 			if !firstGuess {
 				nextHint, hasNextHint := hints.NextHint(timeLeftSeconds)
 				if hasNextHint {
+					log.Debug().
+						Int("wordIndex", nextHint.WordIndex).
+						Int("charIndex", nextHint.CharIndex).
+						Str("char", string(nextHint.Char)).
+						Msg("Generating next hint")
 					hintsToSend = append(hintsToSend, nextHint)
 				}
 			}
@@ -275,11 +309,15 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 			if wordGuess.Timestamp >= startTime {
 				if g.handleGuess(currentTurnUser, currentWord, guesses, wordGuess) {
 					if guesses.FinishedGuessing() {
+						log.Debug().Msg("Everyone has guessed the word")
+
 						timeLeftSeconds = 0
 						g.status.SetTimeRemaining(0)
-						g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, 0, hintsToSend))
+						g.broadcast(events.TurnDrawingCountdown(maxTimeSeconds, timeLeftSeconds, hintsToSend))
 						return
 					} else if timeLeftSeconds > setting.MaxTurnDrawingTimeCutSeconds {
+						log.Debug().Msg("First guess of the word, reducing countdown timer")
+
 						firstGuess = true
 						timeLeftSeconds = setting.MaxTurnDrawingTimeCutSeconds
 						g.status.SetTimeRemaining(timeLeftSeconds)
@@ -293,12 +331,18 @@ func (g *GameStateProcessor) waitForGuessOrTimeout(
 
 // beginWordSelection starts the word selection process for the current turn
 func (g *GameStateProcessor) beginWordSelection(userModel model.User, setting settings.GameSettings) ([]string, int) {
+	log.Debug().Str("uid", userModel.ID).Msg("Beginning word selection phase for the drawer")
 	g.status.SetTurnStatus(model.TurnSelection)
 
 	// Generate random word list (words that have not been recorded yet)
 	generatedWords := g.status.GenerateWords()
 	maxSelectionTimeSeconds := setting.MaxTurnSelectionTimeSeconds
 	g.status.SetTimeRemaining(maxSelectionTimeSeconds)
+
+	log.Debug().
+		Str("uid", userModel.ID).
+		Strs("words", generatedWords).
+		Msg("Generated random words for the drawer")
 
 	// Send TurnBeginSelection event to current drawer (with the words)
 	// Send TurnBeginSelection event to the other players (without the words)
@@ -310,6 +354,7 @@ func (g *GameStateProcessor) beginWordSelection(userModel model.User, setting se
 
 // beginTurnDrawing starts the turn drawing
 func (g *GameStateProcessor) beginTurnDrawing(userModel model.User, word words.GameWord, setting settings.GameSettings) int {
+	log.Debug().Str("uid", userModel.ID).Msg("Beginning drawing phase for the drawer")
 	g.status.SetTurnStatus(model.TurnDrawing)
 
 	maxDrawingTimeSeconds := setting.MaxTurnDrawingTimeSeconds
@@ -331,6 +376,8 @@ func (g *GameStateProcessor) skipTurn() {
 }
 
 func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings.GameSettings) {
+	log.Debug().Str("uid", userModel.ID).Msg("Beginning turn end phase for the drawer")
+
 	g.status.SetTurnStatus(model.TurnEnded)
 	word := g.status.CurrentWord().Word()
 
@@ -345,6 +392,8 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 		select {
 
 		case <-timeout:
+			log.Debug().Msg("Turn end phase timeout")
+
 			g.status.SetTimeRemaining(0)
 			g.broadcast(events.TurnEndCountdown(maxTimeSeconds, 0))
 
@@ -363,6 +412,8 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 				timeLeftSeconds = 0
 			}
 
+			log.Debug().Int("timeLeft", timeLeftSeconds).Msg("Turn end timer countdown")
+
 			g.status.SetTimeRemaining(timeLeftSeconds)
 			g.broadcast(events.TurnEndCountdown(maxTimeSeconds, timeLeftSeconds))
 		}
@@ -371,7 +422,7 @@ func (g *GameStateProcessor) beginTurnEnd(userModel model.User, setting settings
 
 // checkRounds returns a boolean of whether the rounds played has exceeded the maximum number of rounds to be played
 func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
-	log.Info().Int("round", g.status.CurrentRound()).Msg("Current round is.")
+	log.Debug().Int("round", g.status.CurrentRound()).Msg("Checking current round")
 	if g.status.CurrentRound() >= setting.MaxRounds {
 		return true
 	}
@@ -379,6 +430,9 @@ func (g *GameStateProcessor) checkRounds(setting settings.GameSettings) bool {
 }
 
 func (g *GameStateProcessor) gameOver() {
+	log.Debug().Msg("Game over!")
+
+	g.status.SetStatus(model.GameOver)
 	g.broadcast(events.GameOverEvent{
 		Winners: g.players.Winners(),
 	})

@@ -25,7 +25,7 @@ func ToJson(event SerializableEvent) []byte {
 
 	bytes, err := json.Marshal(&gameEvent)
 	if err != nil {
-		log.Err(err).Msg("Could not marshal GameEvent<" + eventType.String() + "> into JSON")
+		log.Error().Err(err).Msg("Could not marshal GameEvent<" + eventType.String() + "> into JSON")
 		return nil
 	}
 	return bytes

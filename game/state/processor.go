@@ -31,6 +31,9 @@ type GameState interface {
 
 // GameStateProcessor handles the state of the game
 type GameStateProcessor struct {
+	// roomID is the room ID associated with this game state
+	roomID string
+
 	// status is the current Status of the game
 	status status.GameStatus
 
@@ -59,10 +62,11 @@ type GameStateProcessor struct {
 	wordGuess chan Guess
 }
 
-func NewGameStateProcessor() GameState {
+func NewGameStateProcessor(roomID string) GameState {
 	s := settings.DefaultSettings()
 
 	return &GameStateProcessor{
+		roomID:             roomID,
 		status:             status.NewGameStatus(s),
 		players:            players.NewPlayerContainer(s.MaxPlayers),
 		drawingHistory:     drawing.NewDrawingHistory(),
@@ -163,7 +167,8 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 }
 
 func (g *GameStateProcessor) cleanup() {
-	log.Info().Msg("Cleaning up game state processor.")
+	log.Info().Str("roomID", g.roomID).Msg("Cleaning up game state processor")
+	defer log.Info().Str("roomID", g.roomID).Msg("Done cleaning up game state processor!")
 
 	// Cleanup game state processor
 	g.chatHistory.Clear()
@@ -179,8 +184,6 @@ func (g *GameStateProcessor) cleanup() {
 	close(g.wordGuess)
 
 	// TODO: close channels if necessary
-
-	log.Info().Msg("Done cleaning up game state processor!")
 
 	// after cleanup, signal to the room that the game state is done cleaning up
 	g.cleanedUpChan <- true

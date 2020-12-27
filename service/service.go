@@ -39,7 +39,7 @@ func (s *Service) RegisterRoutes() *Service {
 	s.router.Post(api.RoomCreate, func(w http.ResponseWriter, r *http.Request) {
 		ro := s.hub.NewRoom()
 		if err := response.Json(w, model.RoomResponse{RoomID: ro.ID(), Exists: true}, http.StatusOK); err != nil {
-			log.Err(err).Msg("Unable to encode JSON response")
+			log.Error().Err(err).Msg("Unable to encode JSON response")
 		}
 	})
 
@@ -50,7 +50,7 @@ func (s *Service) RegisterRoutes() *Service {
 		if err != nil {
 			respErr := response.Json(w, model.RoomResponse{Exists: false}, http.StatusBadRequest)
 			if respErr != nil {
-				log.Err(respErr).Msg("Unable to encode JSON response")
+				log.Error().Err(respErr).Msg("Unable to encode JSON response")
 			}
 		}
 
@@ -58,7 +58,7 @@ func (s *Service) RegisterRoutes() *Service {
 		_, ok := s.hub.Room(roomReq.RoomID)
 		respErr := response.Json(w, model.RoomResponse{RoomID: roomReq.RoomID, Exists: ok}, http.StatusOK)
 		if respErr != nil {
-			log.Err(respErr).Msg("Unable to encode JSON response")
+			log.Error().Err(respErr).Msg("Unable to encode JSON response")
 		}
 	})
 
@@ -70,7 +70,7 @@ func (s *Service) RegisterRoutes() *Service {
 				roomID, ok := ctxs.RoomID(ctx)
 				if !ok {
 					if err := response.Json(w, model.RoomResponse{Exists: false}, http.StatusBadRequest); err != nil {
-						log.Err(err).Str("route", "/room/"+roomID).Msg("Unable to encode JSON response")
+						log.Error().Err(err).Str("route", "/room/"+roomID).Msg("Unable to encode JSON response")
 					}
 					return
 				}
@@ -87,7 +87,6 @@ func (s *Service) RegisterRoutes() *Service {
 					http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 					return
 				}
-				log.Info().Str("roomID", roomID).Send()
 				ro.ConnectionHandler(w, r)
 			})
 		})

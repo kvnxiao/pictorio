@@ -237,7 +237,7 @@ func (g *GameStateProcessor) StartGame() bool {
 
 func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *user.User, connErrChan chan error) {
 	// Save user connection
-	player := g.players.SaveConnection(user)
+	player := g.players.SaveConnection(user, g.status.Status() == model.GameStarted)
 
 	// Concurrently handle the user's WebSocket connection
 	go user.ReaderLoop(ctx, g.messageQueue, connErrChan)

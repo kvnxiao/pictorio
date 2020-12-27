@@ -23,7 +23,7 @@ type Players interface {
 	AllPlayersReady() ([]string, bool)
 	AllPlayersDisconnected() bool
 
-	SaveConnection(u *user.User) PlayerState
+	SaveConnection(u *user.User, isGameStarted bool) PlayerState
 	RemoveConnection(userID string) PlayerState
 
 	SendEventToAll(event events.SerializableEvent)
@@ -142,7 +142,7 @@ func (s *PlayerStatesMap) AllPlayersDisconnected() bool {
 	return true
 }
 
-func (s *PlayerStatesMap) SaveConnection(u *user.User) PlayerState {
+func (s *PlayerStatesMap) SaveConnection(u *user.User, isGameStarted bool) PlayerState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -157,8 +157,8 @@ func (s *PlayerStatesMap) SaveConnection(u *user.User) PlayerState {
 		player.SetNewConnection(u)
 	} else {
 		// New player has joined the room
-		isRoomFull := len(s.players) >= s.maxPlayers
-		player = newPlayer(u, isRoomFull)
+		isSpectator := len(s.players) >= s.maxPlayers || isGameStarted
+		player = newPlayer(u, isSpectator)
 		s.players[u.ID] = player
 	}
 	player.SetConnected(true)

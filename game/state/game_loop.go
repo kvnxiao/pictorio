@@ -117,7 +117,7 @@ func (g *GameStateProcessor) beginTurnNextPlayer(userModel model.User, setting s
 	g.status.SetTurnStatus(model.TurnNextPlayer)
 
 	maxTimeSeconds := setting.MaxTurnNextPlayerTimeSeconds
-	g.broadcast(events.TurnBeginNextPlayer(userModel, maxTimeSeconds))
+	g.broadcast(events.TurnBeginNextPlayer(userModel, g.status.CurrentRound(), maxTimeSeconds))
 
 	timeLeftSeconds := maxTimeSeconds
 	timeout := time.After(time.Duration(maxTimeSeconds+1) * time.Second)

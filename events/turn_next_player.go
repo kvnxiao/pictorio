@@ -9,6 +9,7 @@ import (
 
 type TurnNextPlayerNonce struct {
 	NextTurnUser model.User `json:"nextTurnUser"`
+	CurrentRound int        `json:"round"`
 }
 
 type TurnNextPlayerEvent struct {
@@ -31,10 +32,11 @@ func (e TurnNextPlayerEvent) GameEventType() GameEventType {
 	return EventTypeTurnNextPlayer
 }
 
-func TurnBeginNextPlayer(nextPlayer model.User, maxTimeSeconds int) TurnNextPlayerEvent {
+func TurnBeginNextPlayer(nextPlayer model.User, round int, maxTimeSeconds int) TurnNextPlayerEvent {
 	return TurnNextPlayerEvent{
 		Nonce: &TurnNextPlayerNonce{
 			NextTurnUser: nextPlayer,
+			CurrentRound: round,
 		},
 		MaxTime:  maxTimeSeconds,
 		TimeLeft: maxTimeSeconds,

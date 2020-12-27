@@ -11,6 +11,7 @@ import (
 	"github.com/kvnxiao/pictorio/hub"
 	"github.com/kvnxiao/pictorio/model"
 	"github.com/kvnxiao/pictorio/response"
+	"github.com/kvnxiao/pictorio/service/users"
 	"github.com/rs/zerolog/log"
 )
 
@@ -36,6 +37,41 @@ func (s *Service) SetupMiddleware() *Service {
 }
 
 func (s *Service) RegisterRoutes() *Service {
+	s.router.Get(api.Name, func(w http.ResponseWriter, r *http.Request) {
+		nameResp, err := users.ReadName(w, r)
+		if err != nil {
+			respErr := response.Json(w, nameResp, http.StatusBadRequest)
+			if respErr != nil {
+				log.Error().Err(respErr).Msg("Unable to encode JSON response")
+			}
+			return
+		}
+
+		respErr := response.Json(w, nameResp, http.StatusOK)
+		if respErr != nil {
+			log.Error().Err(respErr).Msg("Unable to encode JSON response")
+		}
+	})
+
+	s.router.Post(api.Name, func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		var nameReq model.NameRequest
+		err := decoder.Decode(&nameReq)
+		if err != nil {
+			respErr := response.Json(w, model.NameResponse{}, http.StatusBadRequest)
+			if respErr != nil {
+				log.Error().Err(respErr).Msg("Unable to encode JSON response")
+			}
+			return
+		}
+
+		nameResp := users.ChangeName(nameReq.Name, w)
+		respErr := response.Json(w, nameResp, http.StatusOK)
+		if respErr != nil {
+			log.Error().Err(respErr).Msg("Unable to encode JSON response")
+		}
+	})
+
 	s.router.Post(api.RoomCreate, func(w http.ResponseWriter, r *http.Request) {
 		ro := s.hub.NewRoom()
 		if err := response.Json(w, model.RoomResponse{RoomID: ro.ID(), Exists: true}, http.StatusOK); err != nil {
@@ -52,6 +88,7 @@ func (s *Service) RegisterRoutes() *Service {
 			if respErr != nil {
 				log.Error().Err(respErr).Msg("Unable to encode JSON response")
 			}
+			return
 		}
 
 		// Check if room id exists

@@ -6,15 +6,13 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/kvnxiao/pictorio/cookies"
 	"github.com/kvnxiao/pictorio/ctxs"
 	"github.com/kvnxiao/pictorio/game/state"
 	"github.com/kvnxiao/pictorio/game/user"
 	"github.com/kvnxiao/pictorio/model"
-	"github.com/kvnxiao/pictorio/random"
+	"github.com/kvnxiao/pictorio/service/users"
 	"github.com/kvnxiao/pictorio/ws"
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/ksuid"
 	"nhooyr.io/websocket"
 )
 
@@ -126,30 +124,10 @@ func (r *Room) ConnectionHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Read user's unique ID or generate one if not exist
-	userID, err := cookies.GetUserID(req)
-	if err != nil || userID == "" {
-		randomID, err := ksuid.NewRandom()
-		if err != nil {
-			log.Error().Err(err).Msg("Could not generate a unique ID for new user")
-			return
-		}
-		userID = randomID.String()
-		cookies.SetUserID(w, userID)
-	}
-
-	// Ensure user ID parsed from cookies is of expected type
-	userKSUID, err := ksuid.Parse(userID)
+	userKSUID, userName, err := users.Read(w, req)
 	if err != nil {
-		log.Error().Err(err).Msg("Could not parse user ID")
-	}
-
-	// Read user name
-	userName, err := cookies.GetUserName(req)
-	if err != nil || userName == "" {
-		log.Debug().Msg("Generating random name for new user")
-		userName = random.GenerateName()
-		cookies.SetUserName(w, userName)
+		log.Error().Err(err).Msg("Could not read user id / name from connection.")
+		return
 	}
 
 	// Save user ID and name to connection context

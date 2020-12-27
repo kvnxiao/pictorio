@@ -2,6 +2,7 @@ package random
 
 import (
 	"math/rand"
+	"strings"
 )
 
 var adjectives = []string{
@@ -16,4 +17,21 @@ func GenerateName() string {
 	adjective := adjectives[rand.Intn(len(adjectives))]
 	noun := nouns[rand.Intn(len(nouns))]
 	return adjective + " " + noun
+}
+
+func any(value string, arr []string) bool {
+	for _, s := range arr {
+		if s == value {
+			return true
+		}
+	}
+	return false
+}
+
+func IsGeneratedName(name string) bool {
+	split := strings.Split(name, " ")
+	if len(split) == 2 {
+		return any(split[0], adjectives) && any(split[1], nouns)
+	}
+	return false
 }

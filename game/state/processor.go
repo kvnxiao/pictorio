@@ -273,7 +273,7 @@ func (g *GameStateProcessor) HandleUserConnection(ctx context.Context, user *use
 
 	// Broadcast user joined
 	g.broadcast(events.UserJoin(player.ToModel(g.players.RoomLeaderID())))
-	g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has joined the room."))
+	g.broadcastChat(events.ChatUserJoined(userModel))
 }
 
 func (g *GameStateProcessor) RemoveUserConnection(userID string) {
@@ -284,7 +284,7 @@ func (g *GameStateProcessor) RemoveUserConnection(userID string) {
 	if player != nil {
 		userModel := player.ToUserModel()
 		g.broadcast(events.UserLeave(player.ToModel(g.players.RoomLeaderID())))
-		g.broadcastChat(events.ChatSystemEvent(userModel.Name + " has left the room."))
+		g.broadcastChat(events.ChatUserLeft(userModel))
 	}
 }
 

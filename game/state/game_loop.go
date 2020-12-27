@@ -215,7 +215,7 @@ func (g *GameStateProcessor) handleGuess(
 	if word.Word() == candidate {
 		if currentTurnUser.ID == wordGuess.User.ID || guesses.HasGuessed(wordGuess.User.ID) {
 			// Send censored word if user has already guessed the word, or the drawer is trying to send the word
-			g.broadcastChat(events.ChatUserEvent(wordGuess.User, word.Censored()))
+			g.broadcastChat(events.ChatUserMessage(wordGuess.User, word.Censored()))
 			return false
 		}
 
@@ -228,7 +228,7 @@ func (g *GameStateProcessor) handleGuess(
 		drawer, _ := g.players.GetPlayer(currentTurnUser.ID)
 		guesserPoints, drawerPoints := guesses.AddGuessed(wordGuess.User.ID)
 		g.awardPoints(guesser, guesserPoints, drawer, drawerPoints)
-		g.broadcastChat(events.ChatSystemEvent(wordGuess.User.Name + " has guessed the word."))
+		g.broadcastChat(events.ChatUserGuessed(wordGuess.User))
 		return true
 	}
 
@@ -236,10 +236,10 @@ func (g *GameStateProcessor) handleGuess(
 	if strings.Contains(candidate, word.Word()) &&
 		(currentTurnUser.ID == wordGuess.User.ID || guesses.HasGuessed(wordGuess.User.ID)) {
 		// Censor text that contains the word as a substring
-		g.broadcastChat(events.ChatUserEvent(wordGuess.User, words.Censor(len(wordGuess.Value))))
+		g.broadcastChat(events.ChatUserMessage(wordGuess.User, words.Censor(len(wordGuess.Value))))
 	} else {
 		// Regular chat messages
-		g.broadcastChat(events.ChatUserEvent(wordGuess.User, wordGuess.Value))
+		g.broadcastChat(events.ChatUserMessage(wordGuess.User, wordGuess.Value))
 	}
 	return false
 }

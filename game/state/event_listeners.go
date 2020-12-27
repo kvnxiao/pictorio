@@ -16,7 +16,7 @@ func (g *GameStateProcessor) warnServerSourcedEvent(eventType events.GameEventTy
 
 func (g *GameStateProcessor) onChatEvent(event events.ChatEvent) {
 	// Do not process chat events from client trying to impersonate the server
-	if event.User.ID == model.SystemUserID || event.IsSystem {
+	if event.User.ID == model.SystemUserID || event.Type != events.ChatEventUser {
 		log.Error().
 			Msg("Received a " + event.GameEventType().String() + " from client with system user ID / name!")
 		return
@@ -31,7 +31,7 @@ func (g *GameStateProcessor) onChatEvent(event events.ChatEvent) {
 		}
 	} else {
 		// Save event to chat history and broadcast
-		g.broadcastChat(events.ChatUserEvent(event.User, event.Message))
+		g.broadcastChat(events.ChatUserMessage(event.User, event.Message))
 	}
 }
 

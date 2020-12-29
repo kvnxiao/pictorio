@@ -117,7 +117,7 @@ func (s *PlayerStatesMap) ReadyPlayer(userID string, ready bool) bool {
 
 func (s *PlayerStatesMap) UnreadyAllPlayers() {
 	s.mu.Lock()
-	defer s.mu.RUnlock()
+	defer s.mu.Unlock()
 
 	for _, player := range s.players {
 		player.SetReady(false)

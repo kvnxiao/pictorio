@@ -215,7 +215,7 @@ func (g *GameStateProcessor) handleGuess(
 	candidate := strings.ToLower(strings.TrimSpace(wordGuess.Value))
 
 	// Handle word match
-	if word.Word() == candidate {
+	if word.Word() == candidate || strings.HasPrefix(candidate, word.Word()) {
 		if currentTurnUser.ID == wordGuess.User.ID || guesses.HasGuessed(wordGuess.User.ID) {
 			// Send censored word if user has already guessed the word, or the drawer is trying to send the word
 			g.broadcastChat(events.ChatUserMessage(wordGuess.User, word.Censored()))

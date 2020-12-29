@@ -45,8 +45,6 @@ func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
 	// Save event to drawing history
 	handled := false
 	switch event.Type {
-	case events.Line:
-		handled = g.drawingHistory.PromoteLine()
 	case events.Clear:
 		handled = g.drawingHistory.Clear()
 	case events.Undo:
@@ -72,6 +70,18 @@ func (g *GameStateProcessor) onDrawTempEvent(event events.DrawTempEvent) {
 
 	g.drawingHistory.AppendFromTempLine(event.Line)
 	g.broadcastExcluding(event, event.User.ID)
+}
+
+func (g *GameStateProcessor) onDrawTempStopEvent(event events.DrawTempStopEvent) {
+	// Validate drawing is from current turn's user
+	if g.status.CurrentTurnID() != event.User.ID {
+		log.Error().Msg("Received a " + event.GameEventType().String() +
+			" from a client whose user ID does not match the current turn's ID")
+	}
+
+	g.drawingHistory.AppendFromTempLine(event.Line)
+	g.drawingHistory.PromoteLine()
+	g.broadcast(event)
 }
 
 func (g *GameStateProcessor) onDrawSelectColour(event events.DrawSelectColourEvent) {

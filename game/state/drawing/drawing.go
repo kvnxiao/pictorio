@@ -44,8 +44,11 @@ func (d *Drawing) AppendFromTempLine(tempLine model.Line) {
 }
 
 func (d *Drawing) PromoteLine() bool {
+	finalPoints := make([]model.Point, len(d.tempPoints))
+	copy(finalPoints, d.tempPoints)
+
 	d.lines = append(d.lines, model.Line{
-		Points:       d.tempPoints,
+		Points:       finalPoints,
 		ColourIdx:    d.tempColour,
 		ThicknessIdx: d.tempThickness,
 	})

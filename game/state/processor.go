@@ -161,6 +161,14 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				}
 				g.onDrawTempEvent(drawTempEvent)
 
+			case events.EventTypeDrawTempStop:
+				var drawTempStopEvent events.DrawTempStopEvent
+				err := json.Unmarshal(event.Data, &drawTempStopEvent)
+				if err != nil {
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onDrawTempStopEvent(drawTempStopEvent)
+
 			case events.EventTypeDrawSelectColour:
 				var drawSelectColourEvent events.DrawSelectColourEvent
 				err := json.Unmarshal(event.Data, &drawSelectColourEvent)

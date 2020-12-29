@@ -10,8 +10,7 @@ import (
 type DrawEventType int
 
 const (
-	Line DrawEventType = iota
-	Undo
+	Undo DrawEventType = iota
 	Redo
 	Clear
 )

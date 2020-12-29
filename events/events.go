@@ -26,6 +26,7 @@ const (
 	EventTypeDrawTemp                               // client-sourced
 	EventTypeDrawSelectColour						// client-sourced
 	EventTypeDrawSelectThickness					// client-sourced
+	EventTypeDrawTempStop							// client-sourced
 
 	// For receiving chunked data over WebSockets
 	MultiPartPayload GameEventType = 99
@@ -71,6 +72,8 @@ func (e GameEventType) String() string {
 		return "DrawSelectColour"
 	case EventTypeDrawSelectThickness:
 		return "DrawSelectThickness"
+	case EventTypeDrawTempStop:
+		return "DrawTempStopEvent"
 	case MultiPartPayload:
 		return "MULTI_PART_PAYLOAD"
 	default:

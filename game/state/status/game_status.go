@@ -204,11 +204,14 @@ func (s *Status) GenerateWords() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	tempHistory := make(map[string]bool)
+
 	var w []string
 	for len(w) < settings.MaxSelectableWords {
 		word := words.GenerateWord()
-		if !s.wordHistory[word] {
+		if !s.wordHistory[word] && !tempHistory[word] {
 			w = append(w, word)
+			tempHistory[word] = true
 		}
 	}
 
@@ -249,7 +252,7 @@ func (s *Status) Reset() {
 	s.currentWord = words.GameWord{}
 	s.playerOrderIDs = nil
 	s.turnIndex = 0
-	s.wordHistory = make(map[string]bool)
+	// Do not reset word history for players in the same room
 
 	// initialize temp storage variables
 	s.timeLeftSeconds = 0

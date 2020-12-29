@@ -20,6 +20,7 @@ type Players interface {
 	GetConnectedPlayers(includeSpectator bool) []model.User
 
 	ReadyPlayer(userID string, ready bool) bool
+	UnreadyAllPlayers()
 	AllPlayersReady() ([]string, bool)
 	AllPlayersDisconnected() bool
 
@@ -112,6 +113,15 @@ func (s *PlayerStatesMap) ReadyPlayer(userID string, ready bool) bool {
 
 	player.SetReady(ready)
 	return ready
+}
+
+func (s *PlayerStatesMap) UnreadyAllPlayers() {
+	s.mu.Lock()
+	defer s.mu.RUnlock()
+
+	for _, player := range s.players {
+		player.SetReady(false)
+	}
 }
 
 func (s *PlayerStatesMap) AllPlayersReady() ([]string, bool) {

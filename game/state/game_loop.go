@@ -48,6 +48,9 @@ import (
 //      b. Send countdown for this turn state
 //   8. End game loop if round counter reaches max rounds
 func (g *GameStateProcessor) gameLoop() {
+	// Reset ready for all players since the game has already started
+	g.players.UnreadyAllPlayers()
+
 	// while game is in started state, continue game loop
 	for g.status.Status() == model.GameStarted {
 		// Ensure that everyone currently playing is still connected before continuing

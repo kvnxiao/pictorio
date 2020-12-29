@@ -23,6 +23,9 @@ const (
 	EventTypeGameOver                               // server-sourced
 	EventTypeNewGameIssued                          // client-sourced
 	EventTypeNewGameReset                           // server-sourced
+	EventTypeDrawTemp                               // client-sourced
+	EventTypeDrawSelectColour						// client-sourced
+	EventTypeDrawSelectThickness					// client-sourced
 
 	// For receiving chunked data over WebSockets
 	MultiPartPayload GameEventType = 99
@@ -62,6 +65,12 @@ func (e GameEventType) String() string {
 		return "NewGameIssuedEvent"
 	case EventTypeNewGameReset:
 		return "NewGameResetEvent"
+	case EventTypeDrawTemp:
+		return "DrawTempEvent"
+	case EventTypeDrawSelectColour:
+		return "DrawSelectColour"
+	case EventTypeDrawSelectThickness:
+		return "DrawSelectThickness"
 	case MultiPartPayload:
 		return "MULTI_PART_PAYLOAD"
 	default:

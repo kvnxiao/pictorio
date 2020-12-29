@@ -7,21 +7,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type DrawEventType int
-
-const (
-	Line DrawEventType = iota
-	Undo
-	Redo
-	Clear
-)
-
-type DrawEvent struct {
-	User model.User    `json:"user"`
-	Type DrawEventType `json:"type"`
+type DrawTempEvent struct {
+	User model.User `json:"user"`
+	Line model.Line `json:"line"`
 }
 
-func (e DrawEvent) RawJSON() json.RawMessage {
+func (e DrawTempEvent) RawJSON() json.RawMessage {
 	eventBytes, err := json.Marshal(e)
 	if err != nil {
 		log.Error().Err(err).Msg("Could not marshal " + e.GameEventType().String() + " into JSON.")
@@ -30,6 +21,6 @@ func (e DrawEvent) RawJSON() json.RawMessage {
 	return eventBytes
 }
 
-func (e DrawEvent) GameEventType() GameEventType {
-	return EventTypeDraw
+func (e DrawTempEvent) GameEventType() GameEventType {
+	return EventTypeDrawTemp
 }

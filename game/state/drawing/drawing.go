@@ -6,6 +6,10 @@ import (
 
 type History interface {
 	Append(line model.Line) bool
+	AppendFromTempLine(tempLine model.Line)
+	PromoteLine() bool
+	SetTempColour(colourIdx int)
+	SetTempThickness(thicknessIdx int)
 	GetAll() []model.Line
 	Redo() bool
 	Undo() bool
@@ -13,20 +17,48 @@ type History interface {
 }
 
 type Drawing struct {
-	lines     []model.Line
-	redoStack []model.Line
+	tempColour    int
+	tempThickness int
+	tempPoints    []model.Point
+	lines         []model.Line
+	redoStack     []model.Line
 }
 
 func NewDrawingHistory() History {
 	return &Drawing{
-		lines:     nil,
-		redoStack: nil,
+		tempPoints: nil,
+		lines:      nil,
+		redoStack:  nil,
 	}
 }
 
 func (d *Drawing) Append(line model.Line) bool {
 	d.lines = append(d.lines, line)
 	return true
+}
+
+func (d *Drawing) AppendFromTempLine(tempLine model.Line) {
+	d.tempColour = tempLine.ColourIdx
+	d.tempThickness = tempLine.ThicknessIdx
+	d.tempPoints = append(d.tempPoints, tempLine.Points...)
+}
+
+func (d *Drawing) PromoteLine() bool {
+	d.lines = append(d.lines, model.Line{
+		Points:       d.tempPoints,
+		ColourIdx:    d.tempColour,
+		ThicknessIdx: d.tempThickness,
+	})
+	d.tempPoints = nil
+	return true
+}
+
+func (d *Drawing) SetTempColour(colourIdx int) {
+	d.tempColour = colourIdx
+}
+
+func (d *Drawing) SetTempThickness(thicknessIdx int) {
+	d.tempThickness = thicknessIdx
 }
 
 func (d *Drawing) GetAll() []model.Line {
@@ -68,6 +100,9 @@ func (d *Drawing) Undo() bool {
 func (d *Drawing) Clear() bool {
 	d.lines = nil
 	d.redoStack = nil
+	d.tempPoints = nil
+	d.tempColour = 0
+	d.tempThickness = 0
 
 	return true
 }

@@ -46,10 +46,7 @@ func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
 	handled := false
 	switch event.Type {
 	case events.Line:
-		if event.Line == nil {
-			log.Error().Msg("Received a " + event.GameEventType().String() + "[Line] event but the line was nil")
-		}
-		handled = g.drawingHistory.Append(*event.Line)
+		handled = g.drawingHistory.PromoteLine()
 	case events.Clear:
 		handled = g.drawingHistory.Clear()
 	case events.Undo:
@@ -64,6 +61,39 @@ func (g *GameStateProcessor) onDrawEvent(event events.DrawEvent) {
 	if handled {
 		g.broadcastExcluding(event, event.User.ID)
 	}
+}
+
+func (g *GameStateProcessor) onDrawTempEvent(event events.DrawTempEvent) {
+	// Validate drawing is from current turn's user
+	if g.status.CurrentTurnID() != event.User.ID {
+		log.Error().Msg("Received a " + event.GameEventType().String() +
+			" from a client whose user ID does not match the current turn's ID")
+	}
+
+	g.drawingHistory.AppendFromTempLine(event.Line)
+	g.broadcastExcluding(event, event.User.ID)
+}
+
+func (g *GameStateProcessor) onDrawSelectColour(event events.DrawSelectColourEvent) {
+	// Validate drawing is from current turn's user
+	if g.status.CurrentTurnID() != event.User.ID {
+		log.Error().Msg("Received a " + event.GameEventType().String() +
+			" from a client whose user ID does not match the current turn's ID")
+	}
+
+	g.drawingHistory.SetTempColour(event.ColourIndex)
+	g.broadcastExcluding(event, event.User.ID)
+}
+
+func (g *GameStateProcessor) onDrawSelectThickness(event events.DrawSelectThicknessEvent) {
+	// Validate drawing is from current turn's user
+	if g.status.CurrentTurnID() != event.User.ID {
+		log.Error().Msg("Received a " + event.GameEventType().String() +
+			" from a client whose user ID does not match the current turn's ID")
+	}
+
+	g.drawingHistory.SetTempThickness(event.ThicknessIndex)
+	g.broadcastExcluding(event, event.User.ID)
 }
 
 func (g *GameStateProcessor) onReadyEvent(event events.ReadyEvent) {

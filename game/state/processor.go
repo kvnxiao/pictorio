@@ -100,14 +100,16 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 			case events.EventTypeTurnWordSelection:
 			case events.EventTypeTurnDrawing:
 			case events.EventTypeTurnEnd:
+			case events.EventTypeAwardPoints:
+			case events.EventTypeGameOver:
+			case events.EventTypeNewGameReset:
 				g.warnServerSourcedEvent(event.Type)
 
 			case events.EventTypeChat:
 				var chatEvent events.ChatEvent
 				err := json.Unmarshal(event.Data, &chatEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onChatEvent(chatEvent)
 
@@ -115,8 +117,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var drawEvent events.DrawEvent
 				err := json.Unmarshal(event.Data, &drawEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onDrawEvent(drawEvent)
 
@@ -124,8 +125,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var readyEvent events.ReadyEvent
 				err := json.Unmarshal(event.Data, &readyEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onReadyEvent(readyEvent)
 
@@ -133,8 +133,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var startGameIssuedEvent events.StartGameIssuedEvent
 				err := json.Unmarshal(event.Data, &startGameIssuedEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onStartGameIssuedEvent(startGameIssuedEvent)
 
@@ -142,8 +141,7 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var turnWordSelectedEvent events.TurnWordSelectedEvent
 				err := json.Unmarshal(event.Data, &turnWordSelectedEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onTurnWordSelectedEvent(turnWordSelectedEvent)
 
@@ -151,10 +149,33 @@ func (g *GameStateProcessor) EventProcessor(cleanupChan chan bool) {
 				var newGameIssuedEvent events.NewGameIssuedEvent
 				err := json.Unmarshal(event.Data, &newGameIssuedEvent)
 				if err != nil {
-					log.Error().Err(err).
-						Msg("Could not unmarshal " + event.Type.String() + " from user")
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
 				}
 				g.onNewGameIssued(newGameIssuedEvent)
+
+			case events.EventTypeDrawTemp:
+				var drawTempEvent events.DrawTempEvent
+				err := json.Unmarshal(event.Data, &drawTempEvent)
+				if err != nil {
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onDrawTempEvent(drawTempEvent)
+
+			case events.EventTypeDrawSelectColour:
+				var drawSelectColourEvent events.DrawSelectColourEvent
+				err := json.Unmarshal(event.Data, &drawSelectColourEvent)
+				if err != nil {
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onDrawSelectColour(drawSelectColourEvent)
+
+			case events.EventTypeDrawSelectThickness:
+				var drawSelectThicknessEvent events.DrawSelectThicknessEvent
+				err := json.Unmarshal(event.Data, &drawSelectThicknessEvent)
+				if err != nil {
+					log.Error().Err(err).Msg("Could not unmarshal " + event.Type.String() + " from user")
+				}
+				g.onDrawSelectThickness(drawSelectThicknessEvent)
 
 			default:
 				log.Error().Msg("Unknown event type unmarshalled from incoming user event")
